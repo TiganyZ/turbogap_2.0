@@ -32,7 +32,8 @@ module timing
 #ifdef _MPIF90
    use mpi, only: MPI_wtime
 #endif
-   use printing, only: print_parameter, print_message, print_small_message, print_separator
+   use printing, only: print_parameter, print_message, print_small_message, &
+                       print_separator
    use control, only: control_t
 
    implicit none
@@ -49,6 +50,7 @@ contains
       call print_parameter("* gap_soap ", time%gap_soap(3), 's')
       call print_parameter("* gap_2b ", time%gap_2b(3), 's')
       call print_parameter("* gap_3b ", time%gap_3b(3), 's')
+      call print_parameter("* gap_core_pot ", time%gap_core_pot(3), 's')
       call print_separator(' ')
 
       call print_small_message("Neighbors:")

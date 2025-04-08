@@ -40,6 +40,7 @@ module timer
       real(dp) :: gap_soap(3) = 0.0_dp
       real(dp) :: gap_2b(3) = 0.0_dp
       real(dp) :: gap_3b(3) = 0.0_dp
+      real(dp) :: gap_core_pot(3) = 0.0_dp
 
       real(dp) :: io(3) = 0.0_dp
       real(dp) :: checks(3) = 0.0_dp

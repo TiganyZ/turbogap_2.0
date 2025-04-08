@@ -46,6 +46,15 @@ contains
 
    !----------------------------------------
 
+  ! subroutine determine_simulation( do, mode )
+  !   character*8, intent(in) :: mode
+  !   type( control_t ), intent(inout) :: do
+
+  !   if ( mode == "mc" )then
+  !      if ( do% )
+
+
+
   subroutine check_repeat_xyz_and_md( repeat_xyz, do_md )
     logical, intent(in) :: repeat_xyz
     logical, intent(in) :: do_md

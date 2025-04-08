@@ -43,7 +43,8 @@ module turbogap_main
       soap_turbo, &
       gap_2b_t, &
       gap_3b_t, &
-      gap_core_pot_t
+      gap_core_pot_t, &
+      exp_data_t
 
                                        !! TODO: Add the routines for mc / md and
                                               !! have them be like the way above
@@ -54,15 +55,17 @@ module turbogap_main
    use mc_types, only: mc_t
    use mc_interface ! , only: perform_mc
 
+   use vdw_types, only: options_vdw_t
+
    use read_xyz, only: read_xyz_file
 
-   ! use read_gap, only: read_gap_hypers
+   use read_gap, only: read_gap_hypers
    !
    !, &
    !   options_md_t, options_mc_t, &
    !   Params_XPS, Params_XRD, Params_PDF, Params_EXP
 
-   use neighbors_interface, only: build_neighbors_list
+   use neighbors_interface, only: build_neighbors_list, collect_neighbors
 
 #ifdef _MPIF90
    use mpi
@@ -73,10 +76,11 @@ module turbogap_main
 
    use printing, only: print_parameter, print_separator, print_note, &
                        print_error, print_debug, print_small_message, &
-                       print_message, print_line, print_end_of_execution
+                       print_message, print_line, print_end_of_execution, &
+                       print_parameters, printf_message, printf_small_message
 
    use misc, only: print_splash_screen, set_random_seed, get_turbogap_mode, &
-                   split_tasks
+                   split_tasks, get_rcut_max
 
    ! use soap_turbo_desc
    ! use gap
@@ -112,6 +116,7 @@ contains
                                         !! Options for various calculation types
       type(md_t)     :: md
       type(mc_t)     :: mc
+      type(options_vdw_t)     :: options_vdw
       !type(Params_XPS)         :: options_xps
       !type(Params_XRD)         :: options_xrd
       !type(Params_PDF)         :: options_pdf
@@ -136,7 +141,7 @@ contains
       integer :: n_gap_soap = 0
       integer :: n_gap_2b = 0
       integer :: n_gap_3b = 0
-      integer :: n_core_pot = 0
+      integer :: n_gap_core_pot = 0
       type(soap_turbo), allocatable     :: gap_soap_hypers(:)
       type(gap_2b_t), allocatable       :: gap_2b_hypers(:)
       type(gap_3b_t), allocatable       :: gap_3b_hypers(:)
@@ -175,7 +180,8 @@ contains
       integer, allocatable :: der_neighbors_list(:)
 
                                                  !! Experimental data containers
-      ! type(exp_data), allocatable :: exp_data(:)
+      integer :: n_local_properties = 0
+      type(exp_data_t), allocatable :: exp_data(:)
 
                                             !! Turbogap mode (md, mc or predict)
       character*16 :: mode = "none"
@@ -198,7 +204,6 @@ contains
 
                                                           !! Neighbors variables
       type(neighbors_t)    :: neighbors
-      integer, allocatable :: n_atom_pairs_by_rank(:)
       integer, allocatable :: n_atom_pairs_by_rank_prev(:)
 
                                                                        !! Timing
@@ -208,6 +213,7 @@ contains
 
       !*************************************************************************
                                                                      !! MPI Init
+      ! FIXME: Move this outside of the main routine
 #ifdef _MPIF90
       call mpi_init(ierr)
       call mpi_comm_size(MPI_COMM_WORLD, n_tasks, ierr)
@@ -222,7 +228,7 @@ contains
                                                                      !! GPU Init
 #ifdef _GPU
 
-      ! @TODO: Add gpu implementations
+      ! FIXME: Add gpu implementations
       ! #ifdef _DEBUG
       ! if ( rank == 0 )then
       !    call print_debug("Finished initializing GPU", "turbogap_main.f90")
@@ -257,6 +263,7 @@ contains
          thermo, &
          mc, &
          md, &
+         options_vdw, &
          rank)
 
       call time_end(time%io)
@@ -282,16 +289,28 @@ contains
       !
       ! TODO: Input the read files
       !
-      ! call time_start(time%io)
+      call time_start(time%io)
 
-      ! call read_gap_hypers(params%file_gap, &
-      !                      n_soap_turbo, gap_soap_hypers, &
-      !                      n_gap_2b, gap_2b_hypers, &
-      !                      n_gap_3b, gap_3b_hypers, &
-      !                      n_gap_core_pot, gap_core_pot_hypers, &
-      !                      neighbors%rcut_max, do%prediction, params)
+      call read_gap_hypers(params%pot_file, &
+                           n_gap_soap, gap_soap_hypers, &
+                           n_gap_2b, gap_2b_hypers, &
+                           n_gap_3b, gap_3b_hypers, &
+                           n_gap_core_pot, gap_core_pot_hypers, &
+                           neighbors%rcut_max, do%prediction, params)
 
-      ! call time_end(time%io)
+      if (n_gap_soap > 0 .and. rank == 0) &
+         call printf_small_message("Found  ", n_gap_soap, " soap_turbo descriptors")
+      if (n_gap_2b > 0 .and. rank == 0) &
+         call printf_small_message("Found ", n_gap_2b, " 2b descriptors")
+      if (n_gap_3b > 0 .and. rank == 0) &
+         call printf_small_message("Found ", n_gap_3b, " 3b descriptors")
+      if (n_gap_core_pot > 0 .and. rank == 0) &
+         call printf_small_message("Found ", n_gap_core_pot, " core_pot descriptors")
+
+      call time_end(time%io)
+
+      ! FIXME: Will add more types in here for the other rcut maxes later
+      call get_rcut_max(neighbors)
 
 #ifdef _DEBUG
       if (rank == 0) then
@@ -303,31 +322,10 @@ contains
       !*************************************************************************
 
       !*************************************************************************
-                                                          !! Checking gap hypers
-      ! TODO: do check gap parameters
-      !if (n_gap_soap > 0) &
-      !   call check_gap_soap_parameters(n_gap_soap, gap_soap_hypers)
-      !
-      !if (n_gap_2b > 0) &
-      !   call check_gap_2b_parameters(n_gap_2b, gap_2b_hypers)
-      !
-      !if (n_gap_3b > 0) &
-      !   call check_gap_3b_parameters(n_gap_3b, gap_3b_hypers)
-
-#ifdef _DEBUG
-      if (rank == 0) then
-         call print_debug("Finished checking gap hypers", "turbogap_main.f90")
-      end if
-#endif
-
-                                                 !! Finished checking gap hypers
-      !*************************************************************************
-
-      !*************************************************************************
                                                         !! Broadcast soap hypers
 
 #ifdef _MPIF90
-      ! TODO: Implement broadcasting routines for each of the gap descriptors
+      ! FIXME: Implement broadcasting routines for each of the gap descriptors
       !
       ! call time_start( time % mpi )
       !
@@ -348,6 +346,12 @@ contains
       !*************************************************************************
 
       !*************************************************************************
+                                             !! Initialize counters for the loop
+
+      ! call set_md(do, mode, md)
+      ! call set_mc(do, mode, mc)
+
+      !*************************************************************************
                                                            !! Starting Main Loop
       ! main_loop: while ( exit_loop == .false ) then
 #ifdef _DEBUG
@@ -359,7 +363,16 @@ contains
       !*************************************************************************
                                                              !! Reading xyz file
 
+      ! TODO: Decide on what to do for this loop
+
+      ! call decide_what_to_do(  )
+
+      !*************************************************************************
+                                                             !! Reading xyz file
+
       ! Reading the xyz file
+
+      ! FIXME: Insert conditional reading here for the loops
 
       call time_start(time%xyz)
 
@@ -380,6 +393,10 @@ contains
       !*************************************************************************
                                                    !! Prepare MPI load splitting
 
+      ! FIXME: Insert conditional splitting based on whether the number of atoms
+      ! have changed
+
+                        !! Set i_beg and i_end which split atoms among MPI tasks
       call split_tasks(state%n_sites, n_tasks, rank, i_beg, i_end)
 
 #ifdef _DEBUG
@@ -391,40 +408,54 @@ contains
                                                   !! Finished MPI load splitting
       !*************************************************************************
       !
-      !*************************************************************************
-                                                    !! Checking input parameters
-      !
-      ! call time_start( time % checks )
-      !
-      ! if ( do % md ) &
-      !    call check_and_assign_md(params, options_md)
-      !
-      ! if ( do % mc ) &
-      !    call check_and_assign_mc(params, options_md, options_mc)
-      !
-      ! if ( do % exp ) &
-      !    call check_and_assign_exp(params, options_exp)
-      !
-      ! call time_end( time % checks )
-
-#ifdef _DEBUG
-      if (rank == 0) then
-         call print_debug("Finished checking input parameters", "turbogap_main.f90")
-      end if
-#endif
-
-                                           !! Finished checking input parameters
-      !*************************************************************************
 
       !*************************************************************************
                                                            !! Building neighbors
 
-                                                               !!> Pre-neighbors
-      ! allocate (n_atom_pairs_by_rank(1:n_tasks))
+      !> The neighbors list in turbogap is in the following format
+      !!
+      !! Each atom has a number of neighbors, n_neigh. The number of atomic
+      !! neighbors for a site i, is found by neighbors%n_neigh(i)
+      !!
+      !! The actual neighbor list, the indices of neighboring atoms to a
+      !! particular site i, is found by summing over all of the numbers of
+      !! neighbors, adding these numbers to a counter, and then one can index
+      !! into the list from that point on.
+      !!
+      !! e.g. for site 100
+      !!
+      !! n_neigh_site_100 = n_neigh(100)
+      !! k = sum(n_neigh(1:99))
+      !! site_100_neighbors = neighbor_list( k: k + n_neigh(100) )
+      !!
+      !! Note that the first neighbor is always itself!
+      !!
+      !! It is efficient for one to do this in a loop over the neighbors, as
+      !! most of the time, that is what we'd like to do
+      !! i.e.
+      !! k = 0
+      !! do i = 1, n_sites
+      !!    pos_1 = positions(:,i)
+      !!    do j = 1, n_neigh(i)
+      !!       k = k + 1
+      !!       neigh_index = neighbor_list( k )
+      !!       if ( neigh_index == i ) continue
+      !!       pos_2 = positions(:,neigh_index)
+      !!       call calculate_pairwise_thing( pos_1, pos_2, pairwise_thing, &
+      !!                                      options_pairwise_thing)
+      !!    end do
+      !! end do
+
       call time_start(time%neighbors)
 
+                                                      !! Build the neighbor list
       call build_neighbors_list(state, neighbors, do%rebuild_neighbors_list, &
                                 i_beg, i_end, do%timing, rank)
+
+                                      !! Broadcast neighbors and set j_beg j_end
+      call collect_neighbors(neighbors, do%rebuild_neighbors_list, &
+                             state%n_sites, rank, n_tasks, j_beg, j_end, &
+                             time%mpi)
 
       call time_end(time%neighbors)
 
@@ -438,26 +469,8 @@ contains
       !*************************************************************************
 
       !*************************************************************************
-                                            !! Broadcasting neighbor information
-
-      ! call time_start( time % mpi )
-      !
-      ! call broadcast_neighbor_info(neighbors)
-      !
-      ! call time_end( time % mpi )
-      !
-#ifdef _DEBUG
-      if (rank == 0) then
-         call print_debug("Finished bcast neighbor information", "turbogap_main.f90")
-      end if
-#endif
-
-                                   !! Finished broadcasting neighbor information
-      !*************************************************************************
-
-      !*************************************************************************
                                                                  !! get_gap_soap
-      !
+
       ! call time_start( time % soap )
       !
       ! call calculate_soap( do, state, neighbors, gap_soap_hypers, gap_soap)

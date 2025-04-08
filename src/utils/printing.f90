@@ -39,7 +39,6 @@ contains
    subroutine print_parameters(desc, values, unit)
       class(*), intent(in) :: values(:)
       character(len=*) :: desc
-      character(len=max_length) :: string
       character(len=*), optional :: unit
       integer :: i, n
 
@@ -206,7 +205,6 @@ contains
 
    subroutine print_separator(separation_character)
       character, intent(in) :: separation_character
-      character(len=max_length - 2) :: string
 
       call print_line(repeat(separation_character, max_length - 3), 'normal')
 
@@ -225,9 +223,53 @@ contains
 
    end subroutine print_small_message
 
+   subroutine printf_small_message(message, value, message2)
+      character(len=*) :: message
+      character(len=*) :: message2
+      class(*) :: value
+      character(len=max_length*4) :: string
+
+      !call print_separator('-')
+      call print_separator(' ')
+
+      select type (value)
+      type is (character(len=*))
+         write (string, '(a,a,a)') adjustl(message), value, message2
+      type is (real(dp))
+         write (string, '(a,f12.6,a)') adjustl(message), value, message2
+      type is (integer)
+         write (string, '(a,i8,a)') adjustl(message), value, message2
+      end select
+      call print_unbroken_lines(trim(string), 'normal')
+
+   end subroutine printf_small_message
+
+   subroutine printf_message(message, value, message2)
+      character(len=*) :: message
+      character(len=*) :: message2
+      class(*) :: value
+      character(len=max_length*4) :: string
+
+      call print_separator('-')
+      call print_separator(' ')
+
+      select type (value)
+      type is (character(len=*))
+         write (string, '(a,a,a)') adjustl(message), value, message2
+      type is (real(dp))
+         write (string, '(a,f12.6,a)') adjustl(message), value, message2
+      type is (integer)
+         write (string, '(a,i8,a)') adjustl(message), value, message2
+      end select
+      call print_unbroken_lines(trim(string), 'normal')
+
+      call print_separator(' ')
+      call print_separator('-')
+
+   end subroutine printf_message
+
    subroutine print_message(message)
       character(len=*) :: message
-      integer :: length
 
       call print_separator('-')
       call print_separator(' ')
@@ -242,7 +284,6 @@ contains
    subroutine print_debug(message, location)
       character(len=*) :: message, location
       character*32 :: debug = 'debug'
-      integer :: length
 
       call print_separator('X')
       call print_separator(' ')
@@ -259,7 +300,6 @@ contains
    subroutine print_note(message)
       character(len=*) :: message
       character*32 :: debug = 'note'
-      integer :: length
 
       call print_separator('-')
       call print_separator(' ')
@@ -274,7 +314,6 @@ contains
    subroutine print_error(message)
       character(len=*) :: message
       character*32 :: debug = 'error'
-      integer :: length
 
       call print_separator('!')
       call print_separator(' ')
@@ -289,7 +328,6 @@ contains
    subroutine print_warning(message)
       character(len=*) :: message
       character*32 :: debug = 'warning'
-      integer :: length
 
       call print_separator('~')
       call print_separator(' ')

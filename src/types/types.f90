@@ -39,31 +39,35 @@ module types
       integer                  :: n_species
       character*8, allocatable :: species_types(:)
       real(dp), allocatable    :: masses_types(:)
-      logical                  :: masses_in_input_file = .false.
-      logical                  :: masses_from_xyz = .false.
                                                  !! Energy to add to predictions
       real(dp), allocatable    :: e0(:)
                              !! Radii for species to calculate accessible volume
       real(dp), allocatable    :: radii(:)
+
+      logical                  :: masses_in_input_file = .false.
+      logical                  :: masses_from_xyz = .false.
    end type species_info_t
 
    type neighbors_t
                                                          !! Neighbor information
+      integer :: n_neigh_max = 100
+      integer :: n_atom_pairs = 0
+      integer :: n_atom_pairs_total = 0
+      real(dp) :: rcut_max = 4.0_dp
+      real(dp) :: neighbors_buffer = 0.0_dp
+
       real(dp), allocatable :: rjs(:)
       real(dp), allocatable :: phis(:)
       real(dp), allocatable :: thetas(:)
       real(dp), allocatable :: xyz(:, :)
 
       integer, allocatable  :: n_neigh(:)
-      integer :: n_neigh_max = 100
-      integer :: n_atom_pairs = 0
+      integer, allocatable  :: n_neigh_global(:)
       integer, allocatable  :: neighbor_species(:)
       integer, allocatable  :: neighbors_list(:)
       integer, allocatable  :: neighbors_list_temp(:)
+      integer, allocatable  :: n_atom_pairs_by_rank(:)
       logical, allocatable  :: do_list(:)
-
-      real(dp) :: rcut_max = 4.0_dp
-      real(dp) :: neighbors_buffer = 0.0_dp
    end type neighbors_t
 
    type state_t
@@ -71,6 +75,7 @@ module types
       ! Number of atoms
       integer :: n_sites = -1
       integer :: n_sites_supercell = -1
+      integer :: this_n_sites_mpi = -1
 
      !! Lattice parameters
       real(dp) :: a_box(3) = [1.0_dp, 0.0_dp, 0.0_dp]
@@ -128,7 +133,34 @@ module types
       real(dp) :: gpu = 0.0_dp
    end type memory_t
 
+   type local_property_soap_turbo
+      real*8, allocatable :: Qs(:, :), alphas(:), cutoff(:)
+      real*8              :: zeta, delta, V0
+      character*1024      :: file_alphas, file_desc, label
+      integer             :: n_sparse, dim
+      logical             :: do_derivatives = .false., compute = .true.
+   end type local_property_soap_turbo
+
    type soap_turbo
+      real(dp) :: zeta = 2.d0
+      real(dp) :: delta = 1.d0
+      real(dp) :: rcut_max = 5.0_dp
+      real(dp) :: vdw_zeta = 2
+      real(dp) :: vdw_delta = 0.1_dp
+      real(dp) :: vdw_V0 = 1.0_dp
+
+      integer :: n_species = 1
+      integer :: central_species = 0
+      integer :: dim = -1
+      integer :: l_max = 8
+      integer :: radial_enhancement = 0
+      integer :: n_max = 8
+      integer :: n_sparse = -1
+      integer :: vdw_n_sparse = -1
+      integer :: compress_P_nonzero = -1
+      integer :: vdw_index = 0
+      integer :: core_electron_be_index = 0
+
       real(dp), allocatable :: nf(:)
       real(dp), allocatable :: rcut_hard(:)
       real(dp), allocatable :: rcut_soft(:)
@@ -147,28 +179,9 @@ module types
       real(dp), allocatable :: vdw_cutoff(:)
       real(dp), allocatable :: compress_P_el(:)
 
-      real(dp) :: zeta = 2.d0
-      real(dp) :: delta = 1.d0
-      real(dp) :: rcut_max = 5.0_dp
-      real(dp) :: vdw_zeta = 2
-      real(dp) :: vdw_delta = 0.1_dp
-      real(dp) :: vdw_V0 = 1.0_dp
-
       integer, allocatable :: alpha_max(:)
       integer, allocatable :: compress_P_i(:)
       integer, allocatable :: compress_P_j(:)
-      integer :: n_species = 1
-      integer :: central_species = 0
-      integer :: dim = -1
-      integer :: l_max = 8
-      integer :: radial_enhancement = 0
-      integer :: n_max = 8
-      integer :: n_sparse = -1
-      integer :: vdw_n_sparse = -1
-      integer :: compress_P_nonzero = -1
-      integer :: n_local_properties = 0
-      integer :: vdw_index = 0
-      integer :: core_electron_be_index = 0
       character*1024 :: file_alphas = 'none'
       character*1024 :: file_desc = 'none'
       character*1024 :: file_compress = "none"
@@ -186,6 +199,8 @@ module types
       logical :: has_core_electron_be = .false.
       logical :: has_local_properties = .false.
 
+      integer :: n_local_properties = 0
+      type(local_property_soap_turbo), allocatable :: local_property_models(:)
    end type soap_turbo
 
    type gap_2b_t
@@ -216,7 +231,7 @@ module types
       character*8 :: species1, species2
    end type gap_core_pot_t
 
-   type exp_data_container
+   type exp_data_t
       character*1024      :: file_data = "none"
       character*1024      :: label
       character*1024      :: input = "default"
@@ -239,7 +254,7 @@ module types
       real(dp)              :: range_min = 0.d0
       real(dp)              :: range_max = 1.d0
       real(dp)              :: mag
-   end type exp_data_container
+   end type exp_data_t
 
    type exp_pred_container
       integer             :: n_samples = 200
@@ -267,13 +282,8 @@ module types
       real(dp)                 :: core_pot_buffer = 0.0_dp
 
                                    !! Number of local properties for convenience
-      integer                  :: n_local_properties = 0
 
       logical                  :: all_atoms = .true.
-
-      ! indexes the planes in first index
-
-      type(exp_data_container), allocatable :: exp_data(:)
 
    end type input_parameters
 

@@ -125,9 +125,7 @@ contains
       integer, intent(in) :: unit
       integer, intent(in) :: n_elements
       integer, intent(inout) :: iostatus
-      character*1024 :: cjunk
       character*1024 :: string
-      character*1024 :: line
       integer :: i, n_words
 
       read (unit, '(A)', iostat=iostatus) string
@@ -189,7 +187,7 @@ contains
 
       character(len=*), intent(inout) :: string
       character*1 :: upper_case_dict(1:26), lower_case_dict(1:26)
-      integer :: i, j, n
+      integer :: i, j
 
       upper_case_dict = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", &
                          "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", &

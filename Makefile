@@ -34,10 +34,19 @@ SRC := kinds.f90 \
        control.f90 \
        timing.f90 \
        functions.f90 \
+       splines.f90 \
        misc.f90 \
        \
        md_types.f90 \
        mc_types.f90 \
+       vdw_types.f90 \
+       \
+       soap_turbo_functions.f90 \
+       soap_turbo_compress.f90 \
+       soap_turbo_radial.f90 \
+       soap_turbo_angular.f90 \
+       soap_turbo.f90 \
+       \
        \
        neighbors_interface.f90 \
        md_utils.f90 \
@@ -50,6 +59,8 @@ SRC := kinds.f90 \
        read_mc.f90 \
        read_md.f90 \
        read_xyz.f90 \
+       read_gap.f90 \
+       read_vdw.f90 \
        read_files.f90 \
        \
        mpi_utils.f90 \
@@ -104,6 +115,12 @@ $(BUILD_DIR)/%.o: src/%.f90 | $$(@D)
 	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: src/read/%.f90 | $$(@D)
+	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: src/vdw/%.f90 | $$(@D)
+	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: src/gap/%.f90 | $$(@D)
 	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: src/xyz/%.f90 | $$(@D)

@@ -91,15 +91,14 @@ contains
 !**************************************************************************
    subroutine velocity_verlet(positions, positions_prev, velocities, &
                               forces, forces_prev, masses, dt, dt_prev, &
-                              first_step, a_box, b_box, c_box, fix_atom, optimize_for_atoms)
+                              first_step, fix_atom, optimize_for_atoms)
 
       implicit none
 
 !   Input variables
       real*8, intent(inout) :: positions(:, :), positions_prev(:, :), velocities(:, :), &
                                forces_prev(:, :)
-      real*8, intent(in) :: forces(:, :), masses(:), dt, a_box(1:3), b_box(1:3), &
-                            c_box(1:3), dt_prev
+      real*8, intent(in) :: forces(:, :), masses(:), dt, dt_prev
       logical, intent(in) :: first_step, fix_atom(:, :)
 
       integer, intent(in) :: optimize_for_atoms(:)
@@ -194,7 +193,7 @@ contains
 
       real*8, intent(inout) :: vel(:, :)
       real*8, intent(in) :: M(:)
-      real*8 :: cm_pos(1:3), cm_vel(1:3), total_mass
+      real*8 ::  cm_vel(1:3), total_mass
       integer :: Np, i
 
       Np = size(vel, 2)
@@ -220,7 +219,7 @@ contains
 
       real*8, intent(inout) :: positions(:, :)
       real*8, intent(in) :: a_box(1:3), b_box(1:3), c_box(1:3)
-      real*8 :: dist(1:3), d, mid(1:3)
+      real*8 :: dist(1:3), d
       integer :: Np, i, i_shift(1:3)
 
       Np = size(positions, 2)
@@ -320,20 +319,13 @@ contains
       real*8, intent(in) :: vel(:, :), target_pos_step, dt0, tau_dt, forces(:, :), masses(:)
       logical, intent(in) :: init
       real*8, allocatable :: d(:)
-      real*8 :: new_dt, d_max, dt_prev
-      integer :: Np, i, i_max
+      real*8 :: new_dt, d_max
+      integer :: Np, i
       logical :: optimize_time_step, too_large
 
       Np = size(vel, 2)
 
-      if (allocated(d)) then
-         if (size(d) /= Np) then
-            deallocate (d)
-            allocate (d(1:Np))
-         end if
-      else
-         allocate (d(1:Np))
-      end if
+      allocate (d(1:Np))
 
       do i = 1, Np
          d(i) = sqrt(dot_product(vel(1:3, i)*dt + 0.5d0*forces(1:3, i)/masses(i)*dt**2, &
@@ -373,6 +365,8 @@ contains
          new_dt = dt*tau_dt/(tau_dt + dt - new_dt)
          dt = min(new_dt, dt0)
       end if
+
+      deallocate (d)
 
    end subroutine
 !**************************************************************************
@@ -541,12 +535,12 @@ contains
 !   Internal variables
       real*8 :: max_force, this_force, pos(1:3), d, gamma_eps, t_eps(1:3, 1:3)
       real*8, allocatable, save :: frac_pos(:, :), frac_pos_prev(:, :)
-      real*8, save :: energy0, m_prev, a_box0(1:3), b_box0(1:3), c_box0(1:3), &
+      real*8, save :: energy0, a_box0(1:3), b_box0(1:3), c_box0(1:3), &
                       eps(1:6), eps_prev(1:6), gamma_eps_prev, &
                       m_eps_prev, virial_prev(1:6), virial0(1:6), this_virial(1:6), &
                       gamma_back0
       real*8, allocatable, save :: positions0(:, :)
-      integer :: n_sites, i, j, i_shift(1:3)
+      integer :: n_sites, i, i_shift(1:3)
       integer, save :: i_restart
       logical, save :: backtracking, initialized = .false.
 

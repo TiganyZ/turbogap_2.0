@@ -414,9 +414,8 @@ contains
 
    end subroutine read_options_control
 
-   subroutine check_options_control(do, md_nsteps, params)
+   subroutine check_options_control(do, md_nsteps)
       type(control_t), intent(inout) :: do
-      type(input_parameters), intent(inout) :: params
       integer, intent(in) :: md_nsteps
 
       if (do%write_xyz == 0) do%write_xyz = md_nsteps

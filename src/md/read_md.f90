@@ -48,7 +48,6 @@ contains
       ! internal
       character*1024             :: cjunk
       integer, intent(inout)     :: iostatus
-      integer                    :: nw
       character*32 :: implemented_thermostats(1:3)
       character*32 :: implemented_barostats(1:2)
       character*1024             :: long_line
@@ -302,7 +301,6 @@ contains
       type(species_info_t), intent(inout) :: species_info
       logical :: valid_choice
       integer :: i
-      integer :: j
 
 !   Get masses from database
       if ((do%md .or. do%mc) .and. .not. species_info%masses_in_input_file) then

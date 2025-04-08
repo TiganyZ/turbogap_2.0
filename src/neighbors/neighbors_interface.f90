@@ -31,6 +31,7 @@ module neighbors_interface
    use types, only: state_t, neighbors_t
    use functions, only: cross_product
    use timing, only: time_start, time_end
+   use mpi
    implicit none
 
 contains
@@ -39,6 +40,56 @@ contains
 ! This subroutine reads in the XYZ file and builds the lists of neighbors, the spherical
 ! coordinates, etc.
 !
+
+   subroutine collect_neighbors(neighbors, rebuild_neighbors_list, &
+                                n_sites, rank, n_tasks, j_beg, j_end, &
+                                time_mpi)
+      type(neighbors_t), intent(inout) :: neighbors
+      logical, intent(in) :: rebuild_neighbors_list
+      integer, intent(in) :: n_sites
+      integer, intent(in) :: n_tasks
+      integer, intent(in) :: rank
+      integer, intent(out) :: j_beg
+      integer, intent(out) :: j_end
+      real(dp), intent(inout) :: time_mpi(3)
+      integer :: ierr
+
+#ifdef _MPIF90
+      if (rebuild_neighbors_list) then
+         if (.not. allocated(neighbors%n_atom_pairs_by_rank)) then
+            allocate (neighbors%n_atom_pairs_by_rank(n_tasks))
+         end if
+
+         call time_start(time_mpi)
+
+         !     Get total number of atom pairs
+         call mpi_allgather(neighbors%n_atom_pairs, 1, &
+                            MPI_INTEGER, neighbors%n_atom_pairs_by_rank, 1, &
+                            MPI_INTEGER, MPI_COMM_WORLD, ierr)
+
+         neighbors%n_atom_pairs_total = sum(neighbors%n_atom_pairs_by_rank)
+         neighbors%n_atom_pairs = neighbors%n_atom_pairs_total
+
+         !     Get number of neighbors
+         if (.not. allocated(neighbors%n_neigh_global)) &
+            allocate (neighbors%n_neigh_global(1:n_sites))
+         call mpi_reduce(neighbors%n_neigh, neighbors%n_neigh_global,&
+              & n_sites, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         call move_alloc(neighbors%n_neigh_global, neighbors%n_neigh)
+         call mpi_bcast(neighbors%n_neigh, n_sites, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+         call time_end(time_mpi)
+
+         j_beg = 1
+         j_end = neighbors%n_atom_pairs_by_rank(rank + 1)
+      end if
+#else
+      j_beg = 1
+      j_end = neighbors%n_atom_pairs
+      neighbors%n_atom_pairs_by_rank(rank + 1) = neighbors%n_atom_pairs
+#endif
+   end subroutine collect_neighbors
+
    subroutine build_neighbors_list(state, neighbors, rebuild_neighbors, i_beg, i_end, do_timing, rank)
 
       implicit none

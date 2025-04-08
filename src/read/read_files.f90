@@ -45,8 +45,8 @@ module read_files
    use md_types, only: md_t
    use read_md, only: read_options_md, check_options_md
 
-   ! use vdw_types, only: options_vdw_t
-   ! use read_vdw, only: read_options_vdw, check_options_vdw
+   use vdw_types, only: options_vdw_t
+   use read_vdw, only: read_options_vdw, check_options_vdw
 
    use timing, only: time_start, time_end
 
@@ -69,6 +69,7 @@ contains
       thermo, &
       mc, &
       md, &
+      options_vdw, &
       rank)
 
       implicit none
@@ -81,6 +82,7 @@ contains
       type(control_t), intent(inout)        :: do
       type(md_t), intent(inout)             :: md
       type(mc_t), intent(inout)             :: mc
+      type(options_vdw_t), intent(inout)    :: options_vdw
       ! type(nested_t), intent(inout)         :: nested
       ! type(gap_core_pot_t), intent(inout)   :: gap_core_pot
 
@@ -181,20 +183,26 @@ contains
             if (keyword_found) continue
 
                                      !! Read options for controlling the program
-            call read_options_control(input, iostatus, rank, keyword, do, keyword_found, error_flag)
+            call read_options_control(input, iostatus, rank, keyword, do, &
+                                      keyword_found, error_flag)
             if (keyword_found) continue
 
-            !                          !! Read options for controlling monte-carlo
-            call read_options_mc(input, iostatus, rank, keyword, mc, keyword_found, error_flag, &
-                                 species_info%n_species, species_info%species_types)
+                                                 !! Read options for controlling
+                                                 !! Monte-Carlo
+            call read_options_mc(input, iostatus, rank, keyword, mc, &
+                                 keyword_found, error_flag, species_info%n_species, &
+                                 species_info%species_types)
             if (keyword_found) continue
 
-            call read_options_md(input, iostatus, rank, keyword, keyword_found, md)
+                                              !! Read options for controlling MD
+            call read_options_md(input, iostatus, rank, keyword, keyword_found, &
+                                 md)
             if (keyword_found) continue
 
-            ! call read_options_vdw(input, iostatus, keyword, options_vdw, keyword_found, &
-            !                       error_flag)
-            ! if (keyword_found) continue
+            call read_options_vdw(input, iostatus, rank, keyword, options_vdw,&
+                 & keyword_found, error_flag, species_info%n_species,&
+                 & species_info%species_types)
+            if (keyword_found) continue
 
             ! call read_options_exp(input, iostatus, keyword, options_vdw, keyword_found, &
             !                       error_flag)
@@ -219,7 +227,12 @@ contains
       call check_file_exists(params%atoms_file)
       call check_file_exists(params%pot_file)
 
-      call check_options_control(do, md%n_steps, params)
+      call check_options_control(do, md%n_steps)
+
+      call check_options_mc(rank, do, mc, md, thermo, species_info)
+
+      call check_options_vdw(options_vdw, species_info%n_species, species_info &
+                             %species_types, rank)
 
       if (rank == 0) &
          call print_message("Finished reading and checking input file")

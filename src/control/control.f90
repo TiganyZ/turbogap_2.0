@@ -73,6 +73,7 @@ module control
       logical :: variable_time_step = .false.
 
                                          !! Need velocities for hybrid/nested/md
+      logical :: hybrid_mc = .false.
       logical :: need_velocities = .true.
                                                                    !! XYZ options
       logical :: repeat_xyz = .false.

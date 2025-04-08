@@ -32,19 +32,19 @@ module read_gap
    use read_utils
    use printing, only: print_message, print_warning, print_note, &
                        print_debug, print_error, print_parameter
+   use types, only: soap_turbo, gap_2b_t, gap_3b_t, gap_core_pot_t, &
+                    input_parameters
    use soap_turbo_compress_module
+   use splines
    implicit none
 
 contains
 
 !*******************************************************************************
                                             !! Read gap parameters from gap_file
-   subroutine read_gap_hypers(file_gap, &
-                              n_soap_turbo, soap_turbo_hypers, &
-                              n_distance_2b, distance_2b_hypers, &
-                              n_angle_3b, angle_3b_hypers, &
-                              n_core_pot, core_pot_hypers, &
-                              rcut_max, do_prediction, params)
+   subroutine read_gap_hypers(file_gap, n_soap_turbo, soap_turbo_hypers,&
+        & n_distance_2b, distance_2b_hypers, n_angle_3b, angle_3b_hypers,&
+        & n_core_pot, core_pot_hypers, rcut_max, do_prediction, params)
 
       implicit none
 
@@ -84,7 +84,7 @@ contains
       updated_keywords(5) = "local_property_deltas"
       updated_keywords(6) = "local_property_v0s"
 
-      open (unit=10, file=file_gap, status="old", iostat=iostatus)
+      open (unit=10, file=file_gap, status="old", iostat=iostatus, action='read')
 !   Look for the number of instances of each GAP
       n_soap_turbo = 0
       n_distance_2b = 0
@@ -760,7 +760,7 @@ contains
 
    end subroutine read_gap_hypers
 
-   subroutine read_gap_alphas_and_descriptors(file_desc, file_alphas, n_sparse, descriptor_type, alphas, Qs, cutoff)
+   subroutine read_alphas_and_descriptors(file_desc, file_alphas, n_sparse, descriptor_type, alphas, Qs, cutoff)
 
       implicit none
 
@@ -862,7 +862,7 @@ contains
          close (unit_number)
       end if
 
-   end subroutine read_gap_alphas_and_descriptors
+    end subroutine read_alphas_and_descriptors
 
 !**************************************************************************
 end module read_gap

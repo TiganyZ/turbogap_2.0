@@ -51,7 +51,6 @@ contains
       character*8, allocatable, intent(in) :: species_types(:)
       ! internal
       character*1024                       :: cjunk
-      integer                              :: nw
       character*32                         :: implemented_mc_types(1:8)
       logical                              :: valid_choice
       integer                              :: i
@@ -339,20 +338,6 @@ contains
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
 
-      else if (keyword == 'mc_optimize_exp') then
-         backspace (unit)
-         read (unit, *, iostat=iostatus) cjunk, cjunk, mc%optimize_exp
-         if (rank == 0) &
-            call print_parameter("mc_optimize_exp", mc%optimize_exp)
-         call check_iostatus(iostatus, keyword)
-         keyword_found = .true.
-      else if (keyword == 'accessible_volume') then
-         backspace (unit)
-         read (unit, *, iostat=iostatus) cjunk, cjunk, mc%accessible_volume
-         if (rank == 0) &
-            call print_parameter("mc_accessible_volume", mc%accessible_volume)
-         call check_iostatus(iostatus, keyword)
-         keyword_found = .true.
       end if
 
    end subroutine read_options_mc
@@ -364,12 +349,75 @@ contains
       type(thermo_t), intent(inout) :: thermo
       type(species_info_t), intent(inout) :: species_info
       integer, intent(in) :: rank
-      integer :: i, k
+      logical :: check
+      integer :: i, j, k
 
 !   Monte-carlo checks
       if (do%mc) then
+
+         !! Check if hamiltonian carlo
+         if (mc%hamiltonian) then
+            md%randomize_velocities = .true.
+            do%need_velocities = .true.
+            mc%hybrid_opt = 'vv'
+            do%hybrid_mc = .true.
+            if (rank == 0) &
+                 call print_message("Doing a Hamilonian MC calculation, setting&
+                 & hybrid_opt = 'vv' ")
+
+            check = .false.
+            do i = 1, mc%n_types
+               if (mc%types(i) == "insertion") check = .true.
+               if (mc%types(i) == "removal") check = .true.
+            end do
+
+            if (check) then
+               if (rank == 0) &
+                    call print_note("Hamiltonian MC does not have a well defined&
+                    & kinetic energy at the moment when doing Grand-Canonical&
+                    & Monte-Carlo (when you include insertion/removal in your&
+                    & Monte-Carlo types). A 3/2 kbT term could be added if you&
+                    & want do this. Contact Tigany Zarrouk&
+                    & tigany.zarrouk@aalto.fi.")
+            end if
+         end if
+
+         !! Check if hybrid monte carlo
+
+         if (mc%relax) then
+            do%hybrid_mc = .true.
+            do%need_velocities = .true.
+
+            check = .false.
+
+            ! Checking if the types in mc_relax_after match a given type
+            do i = 1, mc%n_relax_after
+               check = .true.
+               do j = 1, mc%n_types
+                  if (trim(mc%relax_after(i)) == trim(mc%types(j))) then
+                     check = .false.
+                  end if
+                  if (check) then
+                     if (rank == 0) then
+                        call print_error("The MC move "//mc%relax_after(i)//" in&
+                        & mc_relax_after does not match any of the mc_types."&
+                        & )
+                        call turbogap_abort()
+                     end if
+                  end if
+               end do
+            end do
+
+            if (rank == 0) &
+               call print_message("Doing a Hybrid MC calculation with relaxation")
+         end if
+
          do i = 1, mc%n_types
             if (mc%types(i) == "md") then
+
+               do%hybrid_mc = .true.
+               do%need_velocities = .true.
+
                if (md%thermostat == "none") then
                   if (rank == 0) write (*, *) '                                       |'
                   if (rank == 0) write (*, *) 'WARNING: You need to specify a         |  <-- WARNING'
@@ -378,12 +426,17 @@ contains
             end if
 
             if (mc%types(i) == "relax") then
+
+               do%hybrid_mc = .true.
+               do%need_velocities = .true.
                if (md%optimize == "none") then
                   if (rank == 0) write (*, *) '                                       |'
                   if (rank == 0) write (*, *) 'WARNING: You need to specify an        |  <-- WARNING'
                   if (rank == 0) write (*, *) 'optimizer when using relax type mc     |'
                   if (rank == 0) write (*, *) 'steps!!                                |'
+                  call turbogap_abort()
                end if
+
             end if
 
             if (mc%types(i) == "volume") then

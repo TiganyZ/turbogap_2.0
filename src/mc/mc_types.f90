@@ -64,8 +64,7 @@ module mc_types
       character*8 :: relax_opt = 'gd'
       character*8 :: hybrid_opt = 'vv'
 
-      ! Reverse MC
-      logical :: optimize_exp = .false.
+      ! Hamiltonian MC
       logical :: hamiltonian = .false.
 
       ! MC Restriction to region

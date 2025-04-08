@@ -26,7 +26,7 @@
 ! HND X
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-module vdw_type
+module vdw_types
    use kinds, only: dp
    implicit none
 
@@ -34,6 +34,7 @@ module vdw_type
       real(dp), allocatable :: vdw_c6_ref(:)
       real(dp), allocatable :: vdw_r0_ref(:)
       real(dp), allocatable :: vdw_alpha0_ref(:)
+      logical               :: are_vdw_refs_read(3) = .false.
       real(dp)              :: vdw_sr = 0.94_dp
       real(dp)              :: vdw_d = 20.0_dp
       real(dp)              :: vdw_rcut = 10.0_dp
@@ -45,7 +46,6 @@ module vdw_type
       character*32          :: vdw_type = "none"
       logical               :: vdw_mbd_grad = .false.
       logical               :: vdw_forces = .true.
-      logical               :: are_vdw_refs_read(3) = .false.
    end type options_vdw_t
 
 end module vdw_types

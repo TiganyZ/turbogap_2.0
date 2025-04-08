@@ -34,7 +34,6 @@ contains
 
    subroutine turbogap_abort()
       integer :: ierror
-      integer :: errorcode
 
 #ifdef _MPIF90
       call MPI_finalize(ierror)

@@ -224,8 +224,6 @@ contains
       type(state_t), intent(inout) :: state
       logical, intent(in) :: need_velocities
       logical, intent(in) :: supercell_check_only
-      integer :: counter
-      integer :: i, k2, j2, i2
 
       state%n_sites_supercell = state%n_sites
       if (allocated(state%xyz_species_supercell)) deallocate (state%xyz_species_supercell)
@@ -239,19 +237,13 @@ contains
       if (supercell_check_only) then
          allocate (state%positions_supercell(1:3, 1:state%n_sites_supercell))
          state%positions_supercell = state%positions(1:3, 1:state%n_sites_supercell)
-         deallocate (state%positions)
-         allocate (state%positions(1:3, 1:state%n_sites_supercell))
-         state%positions(1:3, 1:state%n_sites_supercell) = state%positions_supercell(1:3, 1:state%n_sites_supercell)
-         deallocate (state%positions_supercell)
+         call move_alloc(state%positions_supercell, state%positions)
          !       We need to comment this out here for nested sampling
          !        if( do_md )then
          if (allocated(state%velocities)) then
             allocate (state%velocities_supercell(1:3, 1:state%n_sites_supercell))
             state%velocities_supercell = state%velocities(1:3, 1:state%n_sites_supercell)
-            deallocate (state%velocities)
-            allocate (state%velocities(1:3, 1:state%n_sites_supercell))
-            state%velocities(1:3, 1:state%n_sites_supercell) = state%velocities_supercell(1:3, 1:state%n_sites_supercell)
-            deallocate (state%velocities_supercell)
+            call move_alloc(state%velocities_supercell, state%velocities)
          end if
       end if
    end subroutine set_normal_cell
@@ -271,8 +263,6 @@ contains
                   state%positions_supercell(1:3, counter) = state%positions(1:3, i) + dfloat(i2 - 1)*state%a_box(1:3) &
                                                             + dfloat(j2 - 1)*state%b_box(1:3) &
                                                             + dfloat(k2 - 1)*state%c_box(1:3)
-                  !             We need to comment this out here for nested sampling
-                  !              if( do_md )then
                   if (need_velocities) then
                      state%velocities_supercell(1:3, counter) = state%velocities(1:3, i)
                   end if
@@ -283,18 +273,13 @@ contains
             end do
          end do
       end do
-      deallocate (state%positions)
-      allocate (state%positions(1:3, 1:state%n_sites_supercell))
-      state%positions(1:3, 1:state%n_sites_supercell) = state%positions_supercell(1:3, 1:state%n_sites_supercell)
-      deallocate (state%positions_supercell)
-      !     We need to comment this out here for nested sampling
-      !      if( do_md )then
+
+      call move_alloc(state%positions_supercell, state%positions)
+
       if (need_velocities) then
-         deallocate (state%velocities)
-         allocate (state%velocities(1:3, 1:state%n_sites_supercell))
-         state%velocities(1:3, 1:state%n_sites_supercell) = state%velocities_supercell(1:3, 1:state%n_sites_supercell)
-         deallocate (state%velocities_supercell)
+         call move_alloc(state%velocities_supercell, state%velocities)
       end if
+
       state%a_box = dfloat(state%indices(1))*state%a_box
       state%b_box = dfloat(state%indices(2))*state%b_box
       state%c_box = dfloat(state%indices(3))*state%c_box
@@ -306,7 +291,6 @@ contains
       type(state_t), intent(inout) :: state
       character*1024, intent(inout) :: properties
       character*128 :: cjunk, cjunk_array(1:100)
-      character*1024 :: cjunk1024
       character*12800 :: cjunk_array_flat
       integer :: i
 

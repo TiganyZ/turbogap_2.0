@@ -28,12 +28,34 @@
 
 module misc
    use kinds, only: dp
-   use types, only: input_parameters
+   use types, only: input_parameters, neighbors_t
    use timer, only: times_t
    use printing, only: print_error, print_parameter, print_separator, print_line
    implicit none
 
 contains
+
+                                                   !! FIXME: add more rcut maxes
+   subroutine get_rcut_max(neighbors)
+      type(neighbors_t), intent(inout) :: neighbors
+
+      ! !   Check if vdw_rcut is bigger
+      ! if( params%vdw_rcut > rcut_max )then
+      !    rcut_max = params%vdw_rcut
+      ! end if
+      ! if( params%xrd_rcut > rcut_max )then
+      !    rcut_max = params%xrd_rcut
+      ! end if
+      ! if( params%nd_rcut > rcut_max )then
+      !    rcut_max = params%nd_rcut
+      ! end if
+      ! if( params%pair_distribution_rcut > rcut_max )then
+      !    rcut_max = params%pair_distribution_rcut
+      ! end if
+
+      !   We increase rcut_max by the neighbors buffer
+      neighbors%rcut_max = neighbors%rcut_max + neighbors%neighbors_buffer
+   end subroutine get_rcut_max
 
    !*************************************************************************
                                                                 !! MPI splitting
@@ -157,14 +179,14 @@ contains
          call srand(int(params%seed))
          if (rank == 0) then
             call print_parameter("Random Seed read. Set to ", seed)
-            call print_separator('.')
+            call print_separator('-')
          end if
       else
          seed = int(time%total(1)*1000)
          call srand(int(time%total(1)*1000))
          if (rank == 0) then
             call print_parameter("Random Seed is ", seed)
-            call print_separator('.')
+            call print_separator('-')
          end if
       end if
    end subroutine set_random_seed
