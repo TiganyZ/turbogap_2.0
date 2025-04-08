@@ -1,0 +1,13 @@
+bin/
+build/
+create_copyright.sh
+include/
+lib/
+make_tests.sh
+plan.org
+src/control/control.mod
+src/xyz/read_xyz_backup.f90
+src_bk/
+test_types/
+tests/
+tests_manual/
