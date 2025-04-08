@@ -239,7 +239,7 @@ contains
          backspace (unit)
          call read_parameters(unit, iostatus, mc%n_mu, mc%mu)
          if (rank == 0) &
-            call print_parameters("mc_mu", mc%mu)
+            call print_parameters("mc_mu", mc%mu, 'eV')
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
       else if (keyword == 'mc_species') then

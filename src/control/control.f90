@@ -62,6 +62,9 @@ module control
                                                            !! Multiple xyz files
       logical :: xyz = .false.
 
+                                                                    !! Neighbors
+      logical :: rebuild_neighbors_list = .true.
+
                                                  !! Experimental energies forces
       logical :: exp_energies = .true.
       logical :: exp_forces = .false.

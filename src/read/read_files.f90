@@ -43,7 +43,7 @@ module read_files
    use read_mc, only: read_options_mc, check_options_mc
 
    use md_types, only: md_t
-   ! use read_md, only: read_options_md, check_options_md
+   use read_md, only: read_options_md, check_options_md
 
    ! use vdw_types, only: options_vdw_t
    ! use read_vdw, only: read_options_vdw, check_options_vdw
@@ -107,10 +107,12 @@ contains
       logical                      :: error_flag
       logical                      :: show
 
-      if (rank == 0) &
-         call print_note("Showing what is read from input file for your perusal.")
+      call check_file_exists("input")
 
-      open (unit=input, file='input', status='old', iostat=iostatus)
+      if (rank == 0) &
+         call print_message("Showing what is read from input file for your perusal.")
+
+      open (unit=input, file='input', status='old', iostat=iostatus, action='read')
       do while (iostatus == 0)
          read (input, *, iostat=iostatus) keyword
          keyword = trim(keyword)
@@ -187,9 +189,8 @@ contains
                                  species_info%n_species, species_info%species_types)
             if (keyword_found) continue
 
-            ! call read_options_md(input, iostatus, keyword, md, keyword_found, error_flag, &
-            !                      n_species, params%species_types)
-            ! if (keyword_found) continue
+            call read_options_md(input, iostatus, rank, keyword, keyword_found, md)
+            if (keyword_found) continue
 
             ! call read_options_vdw(input, iostatus, keyword, options_vdw, keyword_found, &
             !                       error_flag)
@@ -215,10 +216,13 @@ contains
 !   Do some checks
 !
 
+      call check_file_exists(params%atoms_file)
+      call check_file_exists(params%pot_file)
+
       call check_options_control(do, md%n_steps, params)
 
       if (rank == 0) &
-         call print_note("Finished reading and checking input file")
+         call print_message("Finished reading and checking input file")
    end subroutine
 !**************************************************************************
 !
@@ -274,7 +278,7 @@ contains
          backspace (input)
          call read_parameters(input, iostatus, species_info%n_species, species_info%masses_types)
          if (rank == 0) &
-            call print_parameters("masses_types", species_info%masses_types)
+            call print_parameters("masses_types", species_info%masses_types, 'au')
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
 !       We convert the masses in amu to eV*fs^2/A^2
@@ -287,13 +291,13 @@ contains
          read (input, *, iostat=iostatus) cjunk, cjunk, thermo%t_beg
          call check_iostatus(iostatus, keyword)
          if (rank == 0) &
-            call print_parameter("t_beg", thermo%t_beg)
+            call print_parameter("t_beg", thermo%t_beg, 'K')
          keyword_found = .true.
       else if (keyword == 't_end') then
          backspace (input)
          read (input, *, iostat=iostatus) cjunk, cjunk, thermo%t_end
          if (rank == 0) &
-            call print_parameter("t_end", thermo%t_end)
+            call print_parameter("t_end", thermo%t_end, 'K')
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
       else if (keyword == 'p_beg') then
@@ -329,7 +333,7 @@ contains
          backspace (input)
          call read_parameters(input, iostatus, species_info%n_species, species_info%e0)
          if (rank == 0) &
-            call print_parameters("e0", species_info%e0)
+            call print_parameters("e0", species_info%e0, 'eV')
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
       else if (keyword == 'max_gbytes_per_process') then

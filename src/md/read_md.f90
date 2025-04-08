@@ -39,12 +39,11 @@ module read_md
 
 contains
 
-   subroutine read_options_md(unit, iostatus, rank, keyword, md, n_species)
+   subroutine read_options_md(unit, iostatus, rank, keyword, keyword_found, md)
       ! Input
-      character*1024, intent(in) :: keyword
+      character(len=*), intent(in) :: keyword
       integer, intent(in)        :: unit
       integer, intent(in)        :: rank
-      integer, intent(in)        :: n_species
 
       ! internal
       character*1024             :: cjunk
@@ -61,6 +60,7 @@ contains
       logical :: valid_choice
       ! out
       type(md_t), intent(inout) :: md
+      logical, intent(inout) :: keyword_found
 
       implemented_thermostats(1) = "none"
       implemented_thermostats(2) = "berendsen"
@@ -70,47 +70,63 @@ contains
       implemented_barostats(2) = "berendsen"
 
       if (keyword == 'tau_t') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%tau_t
-         call print_parameter("md_tau_t", md%tau_t)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%tau_t
+         if (rank == 0) &
+            call print_parameter("md_tau_t", md%tau_t)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'tau_p') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%tau_p
-         call print_parameter("md_tau_p", md%tau_p)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%tau_p
+         if (rank == 0) &
+            call print_parameter("md_tau_p", md%tau_p)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'gamma_p') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%gamma_p
-         call print_parameter("md_gamma_p", md%gamma_p)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%gamma_p
+         if (rank == 0) &
+            call print_parameter("md_gamma_p", md%gamma_p)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'md_step') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%step
-         call print_parameter("md_step", md%step)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%step
+         if (rank == 0) &
+            call print_parameter("md_step", md%step, 'fs')
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'md_nsteps') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%n_steps
-         call print_parameter("md_n_steps", md%n_steps)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%n_steps
+         if (rank == 0) &
+            call print_parameter("md_n_steps", md%n_steps)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
 
       else if (keyword == 'target_pos_step') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%target_pos_step
-         call print_parameter("md_target_pos_step", md%target_pos_step)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%target_pos_step
+         if (rank == 0) &
+            call print_parameter("md_target_pos_step", md%target_pos_step)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
          md%variable_time_step = .true.
       else if (keyword == 'tau_dt') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%tau_dt
-         call print_parameter("md_tau_dt", md%tau_dt)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%tau_dt
+         if (rank == 0) &
+            call print_parameter("md_tau_dt", md%tau_dt)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'thermostat') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%thermostat
-         call print_parameter("md_thermostat", md%thermostat)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%thermostat
+         if (rank == 0) &
+            call print_parameter("md_thermostat", md%thermostat)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
          call upper_to_lower_case(md%thermostat)
          valid_choice = .false.
          do i = 1, size(implemented_thermostats)
@@ -127,10 +143,12 @@ contains
             stop
          end if
       else if (keyword == 'barostat') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%barostat
-         call print_parameter("md_barostat", md%barostat)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%barostat
+         if (rank == 0) &
+            call print_parameter("md_barostat", md%barostat)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
          call upper_to_lower_case(md%barostat)
          valid_choice = .false.
          do i = 1, size(implemented_barostats)
@@ -147,30 +165,40 @@ contains
             stop
          end if
       else if (keyword == 'barostat_sym') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%barostat_sym
-         call print_parameter("md_barostat_sym", md%barostat_sym)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%barostat_sym
+         if (rank == 0) &
+            call print_parameter("md_barostat_sym", md%barostat_sym)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'e_tol') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%e_tol
-         call print_parameter("md_e_tol", md%e_tol)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%e_tol
+         if (rank == 0) &
+            call print_parameter("md_e_tol", md%e_tol, 'eV')
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'f_tol') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%f_tol
-         call print_parameter("md_f_tol", md%f_tol)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%f_tol
+         if (rank == 0) &
+            call print_parameter("md_f_tol", md%f_tol, 'eV/A')
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'p_tol') then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%p_tol
-         call print_parameter("md_p_tol", md%p_tol)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%p_tol
+         if (rank == 0) &
+            call print_parameter("md_p_tol", md%p_tol, 'bar')
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == "optimize") then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%optimize
-         call print_parameter("md_optimize", md%optimize)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%optimize
+         if (rank == 0) &
+            call print_parameter("md_optimize", md%optimize)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
          if (md%optimize == "vv" .or. md%optimize == "gd" .or. md%optimize == "gd-box" .or. &
              md%optimize == "gd-box-ortho") then
             continue
@@ -179,28 +207,36 @@ contains
             stop
          end if
       else if (keyword == "gamma0") then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%gamma0
-         call print_parameter("md_gamma0", md%gamma0)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%gamma0
+         if (rank == 0) &
+            call print_parameter("md_gamma0", md%gamma0)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == "max_opt_step") then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%max_opt_step
-         call print_parameter("md_max_opt_step", md%max_opt_step)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%max_opt_step
+         if (rank == 0) &
+            call print_parameter("md_max_opt_step", md%max_opt_step)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == "max_opt_step_eps") then
-         backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, md%max_opt_step_eps
-         call print_parameter("md_max_opt_step_eps", md%max_opt_step_eps)
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%max_opt_step_eps
+         if (rank == 0) &
+            call print_parameter("md_max_opt_step_eps", md%max_opt_step_eps)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'box_scaling_factor') then
          backspace (unit)
          read (unit, '(A)', iostat=iostatus) long_line
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
          allocate (long_line_items(1:9))
          do i = 1, 9
             read (long_line, *, iostat=iostatus2) cjunk, cjunk, long_line_items(1:i)
             call check_iostatus(iostatus, keyword)
+            keyword_found = .true.
             if (iostatus2 == -1) exit
          end do
          i = i - 1
@@ -243,8 +279,17 @@ contains
       else if (keyword == 'scale_box') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, md%scale_box
-         call print_parameter("md_scale_box", md%scale_box)
+         if (rank == 0) &
+            call print_parameter("md_scale_box", md%scale_box)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
+      else if (keyword == 'randomize_velocities') then
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%randomize_velocities
+         if (rank == 0) &
+            call print_parameter("randomize_velocities", md%randomize_velocities)
+         call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       end if
 
    end subroutine read_options_md

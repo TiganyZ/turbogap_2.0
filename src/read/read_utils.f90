@@ -171,16 +171,16 @@ contains
       inquire (file=trim(filename), exist=res)
    end function file_exists
 
-   subroutine check_file(filename)
+   subroutine check_file_exists(filename)
       character(len=*), intent(in) :: filename
       character(len=100) :: string
       if (.not. file_exists(filename)) then
-         write (string, '(A,1X,A,1X,A)') "The file ", filename, &
+         write (string, '(A,1X,A,1X,A)') "The file ", trim(filename), &
             " does not exist! Please specify the right path in the input file!"
          call print_error(string)
-         stop
+         call turbogap_abort()
       end if
-   end subroutine check_file
+   end subroutine check_file_exists
 
                                       !! Convert string from upper to lower case
    subroutine upper_to_lower_case(string)

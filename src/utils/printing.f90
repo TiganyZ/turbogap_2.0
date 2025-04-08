@@ -36,16 +36,22 @@ module printing
 
 contains
 
-   subroutine print_parameters(desc, values)
+   subroutine print_parameters(desc, values, unit)
       class(*), intent(in) :: values(:)
       character(len=*) :: desc
       character(len=max_length) :: string
+      character(len=*), optional :: unit
       integer :: i, n
 
       n = size(values)
       call print_line(desc, 'normal')
       do i = 1, n
-         call print_parameter("", values(i))
+         if (present(unit)) then
+            call print_parameter("", values(i), unit)
+         else
+            call print_parameter("", values(i))
+         end if
+
       end do
    end subroutine print_parameters
 
@@ -65,8 +71,14 @@ contains
          type is (character(len=*))
             write (string, '(a17,a3,a,a)') adjustl(temp), equals, trim(value), adjustl(unit)
          type is (real(dp))
-            write (temp2, '(g12.6)') value
-            write (string, '(a20,a3,a12,1X,a)') adjustl(temp), equals, adjustl(temp2), adjustl(unit)
+            if (value < 0.0_dp) then
+               write (temp2, '(g13.6)') value
+               write (string, '(a20,a3,a13,1X,a)') adjustl(temp), equals, adjustl(temp2), adjustl(unit)
+            else
+               write (temp2, '(g13.7)') value
+               write (string, '(a20,a3,a13,1X,a)') adjustl(temp), equals, " "//adjustl(temp2), adjustl(unit)
+            end if
+
             !write (string, '(a17,a3,g18.6,a)') adjustl(temp), equals, value, adjustl(unit)
          type is (integer)
             write (string, '(a17,a3,i8,a)') adjustl(temp), equals, value, adjustl(unit)
@@ -78,13 +90,25 @@ contains
 
          select type (value)
          type is (character(len=*))
-            write (string, '(a20,a3,a)') adjustl(temp), equals, trim(value)
+            write (string, '(a20,a3,a)') adjustl(temp), equals, " "//trim(value)
          type is (real(dp))
-            write (temp2, '(g18.6)') value
-            write (string, '(a20,a3,a18)') adjustl(temp), equals, adjustl(temp2)
+            if (value < 0.0_dp) then
+               write (temp2, '(g18.6)') value
+               write (string, '(a20,a3,a18)') adjustl(temp), equals, adjustl(temp2)
+            else
+               write (temp2, '(g19.7)') value
+               write (string, '(a20,a3,a19)') adjustl(temp), equals, " "//adjustl(temp2)
+            end if
+
          type is (integer)
-            write (temp2, '(i8)') value
-            write (string, '(a20,a3,a18)') adjustl(temp), equals, adjustl(temp2)
+            if (value < 0) then
+               write (temp2, '(i8)') value
+               write (string, '(a20,a3,a18)') adjustl(temp), equals, adjustl(temp2)
+            else
+               write (temp2, '(i9)') value
+               write (string, '(a20,a3,a19)') adjustl(temp), equals, " "//adjustl(temp2)
+            end if
+
          type is (logical)
             if (value) then
                write (temp2, '(a6)') '.true.'

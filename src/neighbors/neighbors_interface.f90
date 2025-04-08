@@ -30,6 +30,7 @@ module neighbors_interface
    use kinds, only: dp
    use types, only: state_t, neighbors_t
    use functions, only: cross_product
+   use timing, only: time_start, time_end
    implicit none
 
 contains
@@ -38,14 +39,15 @@ contains
 ! This subroutine reads in the XYZ file and builds the lists of neighbors, the spherical
 ! coordinates, etc.
 !
-   subroutine build_neighbors_list(state, neighbors, rebuild_neighbors, do_list, do_timing, rank)
+   subroutine build_neighbors_list(state, neighbors, rebuild_neighbors, i_beg, i_end, do_timing, rank)
 
       implicit none
       ! Input variables
       integer, intent(in) :: rank
-      logical, intent(in) :: do_list(:)
       logical, intent(in) :: do_timing
       logical, intent(in) :: rebuild_neighbors
+      integer, intent(in) :: i_beg
+      integer, intent(in) :: i_end
       ! In out variables
     !! Contains state % positions, velocities and lattice vectors
       type(state_t), intent(inout) :: state
@@ -53,7 +55,7 @@ contains
 
       !   Output variables
       !   Internal variables
-      real(dp) :: time1, time2, dist(1:3), d, neigh_time, time3, tol, d_tol = 1.d-6
+      real(dp) :: time_total(3), time_neigh(3), time_sph(3), dist(1:3), d, tol, d_tol = 1.d-6
       integer, allocatable ::  head(:), this_list(:)
       integer ::  i, j, &
                  k, k2, i2, j2, i3, j3, k3, mx, my, mz, i_shift(1:3)
@@ -61,9 +63,21 @@ contains
       logical, save :: print_cutoff_warning = .true., print_shape_warning = .true.
 
       if (do_timing) then
-         call cpu_time(time1)
-         time3 = time1
+         time_total = 0.0_dp
+         time_neigh = 0.0_dp
+         call time_start(time_total)
+         call time_start(time_neigh)
       end if
+
+      if (.not. allocated(neighbors%do_list)) then
+         allocate (neighbors%do_list(1:state%n_sites))
+         neighbors%do_list = .false.
+      end if
+#ifdef _MPIF90
+      neighbors%do_list(i_beg:i_end) = .true.
+#else
+      neighbors%do_list = .true.
+#endif
 
       state%n_sites_supercell = size(state%positions, 2)
 
@@ -160,7 +174,7 @@ contains
             head(j) = i
          end do
          do i = 1, state%n_sites
-            if (do_list(i)) then
+            if (neighbors%do_list(i)) then
                !         We always count atom i as its own neighbor. This is useful when building the derivatives
                neighbors%n_neigh(i) = neighbors%n_neigh(i) + 1
                neighbors%n_atom_pairs = neighbors%n_atom_pairs + 1
@@ -219,7 +233,7 @@ contains
          !   Very inefficient algorithm for non-square boxes
       else if (rebuild_neighbors) then
          do i = 1, state%n_sites
-            if (do_list(i)) then
+            if (neighbors%do_list(i)) then
                !         We always count atom i as its own neighbor. This is useful when building the derivatives
                neighbors%n_neigh(i) = neighbors%n_neigh(i) + 1
                neighbors%n_atom_pairs = neighbors%n_atom_pairs + 1
@@ -258,9 +272,9 @@ contains
       end if
 
       if (do_timing) then
-         call cpu_time(time2)
-         neigh_time = time2 - time1
-         time1 = time2
+         call time_end(time_neigh)
+         time_sph = 0.0_dp
+         call time_start(time_sph)
       end if
 
       !   NOTE on performance: looping over interactions I could have chosen to calculate each interaction only once,
@@ -285,7 +299,7 @@ contains
       end if
       k2 = 0
       do i = 1, state%n_sites
-         if (do_list(i)) then
+         if (neighbors%do_list(i)) then
             do k = 1, neighbors%n_neigh(i)
                k2 = k2 + 1
                j = neighbors%neighbors_list(k2)
@@ -329,13 +343,14 @@ contains
       end do
 
       if (do_timing) then
-         call cpu_time(time2)
+         call time_end(time_sph)
+         call time_end(time_total)
          write (*, *) '                                       |'
          write (*, *) 'Atoms timings (build):                 |'
          write (*, *) '                                       |'
-         write (*, '(A, F9.3, A)') '  *) Neighbors build: ', neigh_time, ' seconds |'
-         write (*, '(A, F7.3, A)') '  *) Spherical coords.: ', time2 - time1, ' seconds |'
-         write (*, '(A, F19.3, A)') '  *) Total: ', time2 - time3, ' seconds |'
+         write (*, '(A, F9.3, A)') '  *) Neighbors build: ', time_neigh(3), ' seconds |'
+         write (*, '(A, F7.3, A)') '  *) Spherical coords.: ', time_sph(3), ' seconds |'
+         write (*, '(A, F19.3, A)') '  *) Total: ', time_total(3), ' seconds |'
          write (*, *) '                                       |'
          write (*, *) '.......................................|'
       end if

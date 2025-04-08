@@ -40,6 +40,7 @@ module types
       character*8, allocatable :: species_types(:)
       real(dp), allocatable    :: masses_types(:)
       logical                  :: masses_in_input_file = .false.
+      logical                  :: masses_from_xyz = .false.
                                                  !! Energy to add to predictions
       real(dp), allocatable    :: e0(:)
                              !! Radii for species to calculate accessible volume
@@ -59,6 +60,7 @@ module types
       integer, allocatable  :: neighbor_species(:)
       integer, allocatable  :: neighbors_list(:)
       integer, allocatable  :: neighbors_list_temp(:)
+      logical, allocatable  :: do_list(:)
 
       real(dp) :: rcut_max = 4.0_dp
       real(dp) :: neighbors_buffer = 0.0_dp
@@ -75,6 +77,7 @@ module types
       real(dp) :: b_box(3) = [0.0_dp, 1.0_dp, 0.0_dp]
       real(dp) :: c_box(3) = [0.0_dp, 0.0_dp, 1.0_dp]
       integer  :: indices(3) = 1
+      integer  :: indices_prev(3) = 1
 
       ! Dynamical state
       real(dp), allocatable    :: positions(:, :)

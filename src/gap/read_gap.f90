@@ -58,9 +58,9 @@ contains
       integer, intent(out) :: n_soap_turbo, n_distance_2b, n_angle_3b, n_core_pot
       integer :: nw
       type(soap_turbo), allocatable, intent(out) :: soap_turbo_hypers(:)
-      type(distance_2b), allocatable, intent(out) :: distance_2b_hypers(:)
-      type(angle_3b), allocatable, intent(out) :: angle_3b_hypers(:)
-      type(core_pot), allocatable, intent(out) :: core_pot_hypers(:)
+      type(gap_2b_t), allocatable, intent(out) :: distance_2b_hypers(:)
+      type(gap_3b_t), allocatable, intent(out) :: angle_3b_hypers(:)
+      type(gap_core_pot_t), allocatable, intent(out) :: core_pot_hypers(:)
 !   Internal variables
       real(dp), allocatable :: u(:), x(:), V(:)
       real(dp) :: sig, p, qn, un
@@ -99,6 +99,7 @@ contains
             exit
          end if
          keyword_first = keyword(1:1)
+
          if (keyword_first == '#' .or. keyword_first == '!') then
             continue
          else if (keyword == 'gap_beg') then

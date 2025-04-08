@@ -26,13 +26,63 @@
 ! HND X
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-module splash
+module misc
    use kinds, only: dp
+   use types, only: input_parameters
+   use timer, only: times_t
+   use printing, only: print_error, print_parameter, print_separator, print_line
    implicit none
 
-   contains 
+contains
 
-   subroutine print_splash_screen(rank)
+   !*************************************************************************
+                                                                !! MPI splitting
+
+   subroutine split_tasks(n_sites, n_tasks, rank, i_beg, i_end)
+      integer, intent(in) :: n_sites
+      integer, intent(in) :: n_tasks
+      integer, intent(in) :: rank
+      integer, intent(out) :: i_beg
+      integer, intent(out) :: i_end
+
+#ifdef _MPIF90
+      if (rank < mod(n_sites, n_tasks)) then
+         i_beg = 1 + rank*(n_sites/n_tasks + 1)
+      else
+         i_beg = 1 + mod(n_sites, n_tasks)*(n_sites/n_tasks + 1) + (rank - mod(n_sites, n_tasks))*(n_sites/n_tasks)
+      end if
+      if (rank < mod(n_sites, n_tasks)) then
+         i_end = (rank + 1)*(n_sites/n_tasks + 1)
+      else
+         i_end = i_beg + n_sites/n_tasks - 1
+      end if
+
+#else
+      i_beg = 1
+      i_end = n_sites
+#endif
+   end subroutine split_tasks
+
+   !*************************************************************************
+                                                                !! Splash Screen
+   subroutine print_splash_screen(rank, n_tasks, n_omp_tasks)
+
+      integer, intent(in) :: rank
+      integer, intent(in) :: n_tasks
+      integer, intent(in) :: n_omp_tasks
+
+      if (rank == 0) then
+         call splash_screen(rank)
+         ! FIXME: Modify the printing so it looks nice!
+         call print_line("Running TurboGAP with MPI ")
+         call print_parameter(" n_tasks", n_tasks)
+#ifdef _OPENMP
+         call print_parameter("             with OPENMP threads", n_omp_tasks)
+#endif
+      end if
+   end subroutine print_splash_screen
+
+   subroutine splash_screen(rank)
       integer, intent(in) :: rank
 
 #ifdef _MPIF90
@@ -74,7 +124,7 @@ module splash
          write (*, *) '                                                                 |'
          write (*, *) '.................................................................|'
          write (*, *) '                                                                 |'
-         write (*, *) '                     Last updated: June. 2023                     |'
+         write (*, *) '                     Last updated: April 2025                    |'
          write (*, *) '                                        _________________________/'
          write (*, *) '.......................................|'
 #ifdef _MPIF90
@@ -91,7 +141,48 @@ module splash
 #ifdef _MPIF90
       END IF
 #endif
-      !**************************************************************************
-   end subroutine print_splash_screen
+   end subroutine splash_screen
 
-end module splash
+   !*************************************************************************
+                                                                  !! Random Seed
+   subroutine set_random_seed(rank, params, time)
+      type(input_parameters), intent(in) :: params
+      type(times_t), intent(in) :: time
+      integer, intent(in) :: rank
+      real(dp) :: seed
+
+      if (params%seed /= -1) then
+         ! call random_seed(put=params%seed)
+         seed = int(params%seed)
+         call srand(int(params%seed))
+         if (rank == 0) then
+            call print_parameter("Random Seed read. Set to ", seed)
+            call print_separator('.')
+         end if
+      else
+         seed = int(time%total(1)*1000)
+         call srand(int(time%total(1)*1000))
+         if (rank == 0) then
+            call print_parameter("Random Seed is ", seed)
+            call print_separator('.')
+         end if
+      end if
+   end subroutine set_random_seed
+
+   !*************************************************************************
+                                                                !! Turbogap Mode
+   subroutine get_turbogap_mode(rank, mode)
+      character*16, intent(inout) :: mode
+      integer, intent(in) :: rank
+      call get_command_argument(1, mode)
+      if (rank == 0) then
+         if (mode == "" .or. mode == "none") then
+            call print_error("TurboGAP was run with an invalid mode! ")
+            call print_error("You need to run 'turbogap md' or 'turbogap predict'&
+                 & or `turbogap mc`")
+            stop
+         end if
+      end if
+   end subroutine get_turbogap_mode
+
+end module misc

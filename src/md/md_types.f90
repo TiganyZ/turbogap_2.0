@@ -87,6 +87,8 @@ module md_types
                    0.d0, 1.d0, 0.d0, &
                    0.d0, 0.d0, 1.d0], [3, 3])
 
+      logical :: randomize_velocities = .false.
+
    end type md_t
 
 contains

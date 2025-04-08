@@ -26,10 +26,14 @@
 ! HND X
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 module read_xyz
-   use read, only: upper_to_lower_case
-   use neighbors, only: number_of_unit_cells_for_given_cutoff
+   use kinds, only: dp
+   use types, only: thermo_t, species_info_t, state_t
+   use control, only: control_t
+   use read_utils, only: upper_to_lower_case
+   use neighbors_interface, only: number_of_unit_cells_for_given_cutoff
    use md_interface, only: reset_velocities
-   use state_interface, only: allocate_state
+   use state_interface, only: reallocate_state, reallocate_state_supercell
+   use printing, only: print_message, print_small_message
 
 contains
 
@@ -41,7 +45,8 @@ contains
    !
    ! SPECIES X Y Z (VX VY VZ (FIXX FIXY FIXZ))
    !
-   subroutine read_xyz( &
+   subroutine read_xyz_file( &
+      rank, &
       filename, &
       thermo, &
       species_info, &
@@ -52,6 +57,7 @@ contains
       implicit none
 
       !   Input variables
+      integer, intent(in) :: rank
       character*1024, intent(in) :: filename
       real(dp), intent(in) :: rcut_max
       type(thermo_t), intent(in) :: thermo
@@ -70,13 +76,16 @@ contains
 
       integer :: iostatus
       character*1024 :: properties
+      character*128 :: cjunk
+
+      integer :: i
 
       state%indices_prev = state%indices
 
       if (.not. do%supercell_check_only) then
          inquire (file=filename, number=i)
          if (i /= xyz_file) then
-            open (unit=xyz_file, file=filename, status="old")
+            open (unit=xyz_file, file=filename, status="old", action='read')
          end if
 
                                                !! Read n_sites and property line
@@ -86,12 +95,12 @@ contains
                                                          !! Reallocate the state
             call reallocate_state(state, do%need_velocities, state%n_sites)
 
-            call read_xyz_lines(xyz_file, iostatus, state, species_info, &
+            call read_xyz_lines(xyz_file, iostatus, do, state, species_info, &
                                 properties, has_velocities, do%need_velocities)
 
             !   Randomize state % velocities if state % velocities are not
             !   provided
-            if (need_velocities .and. .not. has_velocities) then
+            if (do%need_velocities .and. .not. has_velocities) then
                call reset_velocities(state, thermo)
             end if
                          !!   Check if there are more structures in the xyz file
@@ -148,9 +157,9 @@ contains
          state%c_box = state%c_box*dfloat(state%indices_prev(3))
       end if
 
-   end subroutine read_xyz
+   end subroutine read_xyz_file
 
-   subroutine read_xyz_lines(xyz_file, iostatus, state, species_info, properties, &
+   subroutine read_xyz_lines(xyz_file, iostatus, do, state, species_info, properties, &
                              has_velocities, need_velocities)
       integer, intent(in) :: xyz_file
       integer, intent(inout) :: iostatus
@@ -158,8 +167,9 @@ contains
       logical, intent(in) :: need_velocities
       character*1024, intent(in) :: properties
 
+      type(control_t), intent(inout) :: do
       type(state_t), intent(inout) :: state
-      type(state_t), intent(in) :: species_info
+      type(species_info_t), intent(inout) :: species_info
       character*8 :: i_char
       character*128 :: cjunk, cjunk_array(1:100)
       character*1024 :: cjunk1024
@@ -175,15 +185,15 @@ contains
             call read_xyz_line(properties, cjunk1024, i_char, state &
                                %positions(1:3, i), state%velocities(1:3, i), state &
                                %fix_atom(1:3, i), has_velocities, state &
-                               %masses(i), species_info&masses_from_xyz)
+                               %masses(i), species_info%masses_from_xyz)
             if (species_info%masses_from_xyz) then
                state%masses(i) = state%masses(i)*103.6426965268d0
                do%write_masses = .true.
             end if
          else
             call read_xyz_line(properties, cjunk1024, i_char, state &
-                               %positions(1:3, i), rjunk(1:3), ljunk(1:3), has_state &
-                               %velocities, rjunk1d, species_info%masses_from_xyz)
+                               %positions(1:3, i), rjunk(1:3), ljunk(1:3), &
+                               has_velocities, rjunk1d, species_info%masses_from_xyz)
          end if
          do j = 1, species_info%n_species
             if (trim(i_char) == trim(species_info%species_types(j))) then
@@ -219,7 +229,7 @@ contains
 
       state%n_sites_supercell = state%n_sites
       if (allocated(state%xyz_species_supercell)) deallocate (state%xyz_species_supercell)
-      if (allocated(species_supercell)) deallocate (species_supercell)
+      if (allocated(state%species_supercell)) deallocate (state%species_supercell)
       allocate (state%xyz_species_supercell(1:state%n_sites_supercell))
       allocate (state%species_supercell(1:state%n_sites_supercell))
       state%xyz_species_supercell = state%xyz_species
@@ -296,7 +306,7 @@ contains
       type(state_t), intent(inout) :: state
       character*1024, intent(inout) :: properties
       character*128 :: cjunk, cjunk_array(1:100)
-      character*1024 :: cjunk1024, properties
+      character*1024 :: cjunk1024
       character*12800 :: cjunk_array_flat
       integer :: i
 

@@ -54,32 +54,29 @@ module turbogap_main
    use mc_types, only: mc_t
    use mc_interface ! , only: perform_mc
 
+   use read_xyz, only: read_xyz_file
+
+   ! use read_gap, only: read_gap_hypers
+   !
    !, &
    !   options_md_t, options_mc_t, &
    !   Params_XPS, Params_XRD, Params_PDF, Params_EXP
+
+   use neighbors_interface, only: build_neighbors_list
 
 #ifdef _MPIF90
    use mpi
    use mpi_utils
 #endif
 
-   use timing, only: &
-      times_t, &
-      time_start, &
-      time_end, &
-      print_times
+   use timing, only: times_t, time_start, time_end, print_times
 
-   use splash, only: print_splash_screen
+   use printing, only: print_parameter, print_separator, print_note, &
+                       print_error, print_debug, print_small_message, &
+                       print_message, print_line, print_end_of_execution
 
-   use printing, only: &
-      print_parameter, &
-      print_separator, &
-      print_note, &
-      print_error, &
-      print_debug, &
-      print_message, &
-      print_line, &
-      print_end_of_execution
+   use misc, only: print_splash_screen, set_random_seed, get_turbogap_mode, &
+                   split_tasks
 
    ! use soap_turbo_desc
    ! use gap
@@ -236,28 +233,13 @@ contains
 
       !*************************************************************************
                                                           !! Print splash screen
-      if (rank == 0) then
-         call print_splash_screen(rank)
-         ! FIXME: Modify the printing so it looks nice!
-         call print_line("Running TurboGAP with MPI ")
-         call print_parameter(" n_tasks", n_tasks)
-#ifdef _OPENMP
-         call print_parameter("             with OPENMP threads", n_omp_tasks)
-#endif
-      end if
+
+      call print_splash_screen(rank, n_tasks, n_omp_tasks)
 
       !**************************************************************************
                         !! Read the mode. It should be "soap", "predict" or "md"
 
-      call get_command_argument(1, mode)
-      if (rank == 0) then
-         if (mode == "" .or. mode == "none") then
-            call print_error("TurboGAP was run with an invalid mode! ")
-            call print_error("You need to run 'turbogap md' or 'turbogap predict'&
-                 & or `turbogap mc`")
-            stop
-         end if
-      end if
+      call get_turbogap_mode(rank, mode)
 
       !*************************************************************************
       !- Reading input file
@@ -290,22 +272,8 @@ contains
 
       !*************************************************************************
                                                               !! Set random seed
-      if (params%seed /= -1) then
-         ! call random_seed(put=params%seed)
-         seed = int(params%seed)
-         call srand(int(params%seed))
-         if (rank == 0) then
-            call print_parameter("Random Seed read. Set to ", seed)
-            call print_separator('.')
-         end if
-      else
-         seed = int(time%total(1)*1000)
-         call srand(int(time%total(1)*1000))
-         if (rank == 0) then
-            call print_parameter("Random Seed is ", seed)
-            call print_separator('.')
-         end if
-      end if
+
+      call set_random_seed(rank, params, time)
 
       !*************************************************************************
                                                              !! Reading gap file
@@ -313,12 +281,18 @@ contains
       ! Reading .gap file parameters
       !
       ! TODO: Input the read files
-      ! call time_start( time % io )
       !
-      ! call read_gap_file(params)
-      !
-      ! call time_end( time % io )
-      !
+      ! call time_start(time%io)
+
+      ! call read_gap_hypers(params%file_gap, &
+      !                      n_soap_turbo, gap_soap_hypers, &
+      !                      n_gap_2b, gap_2b_hypers, &
+      !                      n_gap_3b, gap_3b_hypers, &
+      !                      n_gap_core_pot, gap_core_pot_hypers, &
+      !                      neighbors%rcut_max, do%prediction, params)
+
+      ! call time_end(time%io)
+
 #ifdef _DEBUG
       if (rank == 0) then
          call print_debug("Finished reading gap file", "turbogap_main.f90")
@@ -374,17 +348,26 @@ contains
       !*************************************************************************
 
       !*************************************************************************
+                                                           !! Starting Main Loop
+      ! main_loop: while ( exit_loop == .false ) then
+#ifdef _DEBUG
+      if (rank == 0) then
+         call print_debug("Starting Main Loop", "turbogap_main.f90")
+      end if
+#endif
+
+      !*************************************************************************
                                                              !! Reading xyz file
 
       ! Reading the xyz file
-      ! call print_parameter("Reading ", params%atoms_file)
-      !
-      ! call time_start( time % xyz )
-      !
-      ! call read_xyz( params%atoms_file, state, n_xyz )
-      !
-      ! call time_end( time % xyz )
-      !
+
+      call time_start(time%xyz)
+
+      call read_xyz_file(rank, params%atoms_file, thermo, species_info, &
+                         neighbors%rcut_max, state, do)
+
+      call time_end(time%xyz)
+
 #ifdef _DEBUG
       if (rank == 0) then
          call print_debug("Finished reading xyz file", "turbogap_main.f90")
@@ -394,6 +377,20 @@ contains
                                                     !! Finished reading xyz file
       !*************************************************************************
 
+      !*************************************************************************
+                                                   !! Prepare MPI load splitting
+
+      call split_tasks(state%n_sites, n_tasks, rank, i_beg, i_end)
+
+#ifdef _DEBUG
+      if (rank == 0) then
+         call print_debug("Finished MPI splitting", "turbogap_main.f90")
+      end if
+#endif
+
+                                                  !! Finished MPI load splitting
+      !*************************************************************************
+      !
       !*************************************************************************
                                                     !! Checking input parameters
       !
@@ -423,13 +420,14 @@ contains
                                                            !! Building neighbors
 
                                                                !!> Pre-neighbors
-      allocate (n_atom_pairs_by_rank(1:n_tasks))
-      ! call time_start( time % neighbors )
-      !
-      ! call build_neighbors( state, neighbors )
-      !
-      ! call time_end( time % neighbors )
-      !
+      ! allocate (n_atom_pairs_by_rank(1:n_tasks))
+      call time_start(time%neighbors)
+
+      call build_neighbors_list(state, neighbors, do%rebuild_neighbors_list, &
+                                i_beg, i_end, do%timing, rank)
+
+      call time_end(time%neighbors)
+
 #ifdef _DEBUG
       if (rank == 0) then
          call print_debug("Finished building neighbors", "turbogap_main.f90")
@@ -456,15 +454,6 @@ contains
 
                                    !! Finished broadcasting neighbor information
       !*************************************************************************
-
-      !*************************************************************************
-                                                           !! Starting Main Loop
-      ! main_loop: while ( exit_loop == .false ) then
-#ifdef _DEBUG
-      if (rank == 0) then
-         call print_debug("Starting Main Loop", "turbogap_main.f90")
-      end if
-#endif
 
       !*************************************************************************
                                                                  !! get_gap_soap
