@@ -40,9 +40,9 @@ module timing
 
 contains
 
-   subroutine print_times(time, do)
+   subroutine print_times(time, do_)
       type(times_t), intent(in) :: time
-      type(control_t), intent(in) :: do
+      type(control_t), intent(in) :: do_
 
       call print_message("Timing")
 
@@ -63,16 +63,16 @@ contains
       call print_parameter("* vdw ", time%vdw(3), 's')
       call print_separator(' ')
 
-      if (do%exp) then
+      if (do_%exp) then
          call print_small_message("Experimental:")
          call print_parameter("* exp ", time%exp(3), 's')
-         if (do%pdf) &
+         if (do_%pdf) &
             call print_parameter("* pdf ", time%pdf(3), 's')
-         if (do%sf) &
+         if (do_%sf) &
             call print_parameter("* sf  ", time%sf(3), 's')
-         if (do%xrd) &
+         if (do_%xrd) &
             call print_parameter("* xrd ", time%xrd(3), 's')
-         if (do%nd) &
+         if (do_%nd) &
             call print_parameter("* nd  ", time%nd(3), 's')
          call print_separator(' ')
       end if

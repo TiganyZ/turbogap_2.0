@@ -40,15 +40,55 @@ contains
 
       implicit none
 
-      real(dp), intent(in) :: soap(:, :), soap_der(:, :, :), alphas(:), delta, Qs(:, :), e0, zeta0, xyz(:, :)
-      real(dp), intent(out) :: energies(:), forces(:, :), virial(1:3, 1:3)
-      integer, intent(in) :: n_neigh(:), neighbors_list(:)
-      logical, intent(in) :: do_forces, do_timing
-      real(dp), allocatable :: kernels(:, :), kernels_der(:, :), Qss(:, :), Qs_copy(:, :), this_Qss(:), &
-                               kernels_copy(:, :)
-      real(dp) :: time1, time2, time3, energies_time, forces_time, zeta, this_force(1:3)
-      integer :: n_sites, n_sparse, n_soap, i, j, k, l, j2, zeta_int, n_sites0, k1, k2
+      real(dp), intent(in) :: soap(:, :)
+      real(dp), intent(in) :: soap_der(:, :, :)
+      real(dp), intent(in) :: alphas(:)
+      real(dp), intent(in) :: delta
+      real(dp), intent(in) :: Qs(:, :)
+      real(dp), intent(in) :: Qs(:, :)
+      real(dp), intent(in) :: e0
+      real(dp), intent(in) :: zeta0
+      real(dp), intent(in) :: xyz(:, :)
+
+      real(dp), intent(out) :: energies(:)
+      real(dp), intent(out) :: forces(:, :)
+      real(dp), intent(out) :: virial(1:3, 1:3)
+
+      integer, intent(in) :: n_neigh(:)
+      integer, intent(in) :: neighbors_list(:)
+
+      logical, intent(in) :: do_forces
+      logical, intent(in) :: do_timing
+
+      real(dp), allocatable :: kernels(:, :)
+      real(dp), allocatable :: kernels_der(:, :)
+      real(dp), allocatable :: Qss(:, :)
+      real(dp), allocatable :: Qs_copy(:, :), this_Qss(:)
+      real(dp), allocatable :: this_Qss(:)
+      real(dp), allocatable :: kernels_copy(:, :)
+
+      real(dp) :: time1
+      real(dp) :: time2
+      real(dp) :: time3
+      real(dp) :: energies_time
+      real(dp) :: forces_time
+      real(dp) :: zeta
+      real(dp) :: this_force(1:3)
+
+      integer :: n_sites
+      integer :: n_sparse
+      integer :: n_soap
+      integer :: i
+      integer :: j
+      integer :: k
+      integer :: l
+      integer :: j2
+      integer :: zeta_int
+      integer :: n_sites0
+      integer :: k1
+      integer :: k2
       logical :: is_zeta_int = .false.
+
 !    integer, allocatable :: neighbors_beg(:), neighbors_end(:)
 
       if (dabs(zeta0 - dfloat(int(zeta0))) < 1.d-5) then
@@ -61,6 +101,7 @@ contains
 
 !   Energies
       if (do_timing) then
+         call time_start(time_energies)
          call cpu_time(time1)
          time3 = time1
       end if

@@ -73,7 +73,8 @@ module types
    type state_t
                            !! The state of the system, positions, velocities etc
       ! Number of atoms
-      integer :: n_sites = -1
+      integer :: n_sites = -2
+      integer :: n_sites_prev = -1
       integer :: n_sites_supercell = -1
       integer :: this_n_sites_mpi = -1
 

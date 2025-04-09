@@ -74,8 +74,8 @@ module read_nested
 
    end subroutine read_options_nested
 
-   subroutine check_options_nested(do, md, nested)
-      type(control_t), intent(inout) :: do
+   subroutine check_options_nested(do_, md, nested)
+      type(control_t), intent(inout) :: do_$
       type(md_t), intent(in) :: md
       type(nested_t), intent(in) :: nested
 

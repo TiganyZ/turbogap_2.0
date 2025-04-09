@@ -52,27 +52,31 @@ contains
    end function check_exit_md
 
                                          !! Set velocities to target temperature
-   subroutine reset_velocities(state, thermo)
+   subroutine reset_velocities(state, thermo, rank)
       type(state_t), intent(inout) :: state
       type(thermo_t), intent(in) :: thermo
+      integer, intent(in) :: rank
       real(dp), parameter :: kB = 8.6173303d-5
       integer :: i
 
-      call print_warning("You have not provided initial velocities. TurboGAP is&
-           & randomizing them to match your initial temperature. ")
-      call print_parameter("t_beg", thermo%t_beg)
+      if (rank == 0) then
+         call print_warning("You have not provided initial velocities/randomize&
+              & velocities is on. TurboGAP is randomizing them to&
+              & match your initial temperature. ")
+         call print_parameter("t_beg", thermo%t_beg)
+      end if
 
       call random_number(state%velocities)
       call remove_cm_vel(state%velocities(1:3, 1:state%n_sites), &
                          state%masses(1:state%n_sites))
-      state%E_kinetic = 0.d0
+      state%E_kinetic = 0.0_dp
       do i = 1, state%n_sites
          state%E_kinetic = state%E_kinetic + &
                            0.5_dp*state%masses(i)* &
                            dot_product(state%velocities(1:3, i), &
                                        state%velocities(1:3, i))
       end do
-      state%instant_temp = 2.d0/3.d0/dfloat(state%n_sites - 1)/kB*state%E_kinetic
+      state%instant_temp = 2.0_dp/3.0_dp/dfloat(state%n_sites - 1)/kB*state%E_kinetic
       state%velocities = state%velocities*dsqrt(thermo%t_beg/state%instant_temp)
    end subroutine reset_velocities
 

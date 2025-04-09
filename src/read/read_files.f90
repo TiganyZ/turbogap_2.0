@@ -64,7 +64,7 @@ contains
       mode, &
       species_info, &
       params, &
-      do, &
+      do_, &
       neighbors, &
       thermo, &
       mc, &
@@ -79,7 +79,7 @@ contains
       character(len=*)                    :: mode
 
       !   Output variables
-      type(control_t), intent(inout)        :: do
+      type(control_t), intent(inout)        :: do_
       type(md_t), intent(inout)             :: md
       type(mc_t), intent(inout)             :: mc
       type(options_vdw_t), intent(inout)    :: options_vdw
@@ -152,7 +152,7 @@ contains
 
       !   Some defaults before reading the input file (the values in the input
       !   file will override them)
-      call initialize_options_control(do, mode)
+      call initialize_options_control(do_, mode)
 
       !   Read the input file now
       iostatus = 0
@@ -183,7 +183,7 @@ contains
             if (keyword_found) continue
 
                                      !! Read options for controlling the program
-            call read_options_control(input, iostatus, rank, keyword, do, &
+            call read_options_control(input, iostatus, rank, keyword, do_, &
                                       keyword_found, error_flag)
             if (keyword_found) continue
 
@@ -227,9 +227,11 @@ contains
       call check_file_exists(params%atoms_file)
       call check_file_exists(params%pot_file)
 
-      call check_options_control(do, md%n_steps)
+      call check_options_md(rank, do_, md, mc, species_info)
 
-      call check_options_mc(rank, do, mc, md, thermo, species_info)
+      call check_options_control(do_, md%n_steps)
+
+      call check_options_mc(rank, do_, mc, md, thermo, species_info)
 
       call check_options_vdw(options_vdw, species_info%n_species, species_info &
                              %species_types, rank)

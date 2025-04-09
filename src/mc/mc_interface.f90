@@ -108,10 +108,10 @@ contains
 #endif
    end subroutine setup_mc
 
-   subroutine perform_mc(state, mc, do, time)
+   subroutine perform_mc(state, mc, do_, time)
       type(state_t), intent(inout) :: state
       type(mc_t), intent(inout) :: mc
-      type(control_t), intent(inout) :: do
+      type(control_t), intent(inout) :: do_
       real(dp), intent(inout) :: time(3)
 
       call time_start(time)

@@ -342,8 +342,8 @@ contains
 
    end subroutine read_options_mc
 
-   subroutine check_options_mc(rank, do, mc, md, thermo, species_info)
-      type(control_t), intent(inout) :: do
+   subroutine check_options_mc(rank, do_, mc, md, thermo, species_info)
+      type(control_t), intent(inout) :: do_
       type(mc_t), intent(inout) :: mc
       type(md_t), intent(inout) :: md
       type(thermo_t), intent(inout) :: thermo
@@ -353,14 +353,14 @@ contains
       integer :: i, j, k
 
 !   Monte-carlo checks
-      if (do%mc) then
+      if (do_%mc) then
 
          !! Check if hamiltonian carlo
          if (mc%hamiltonian) then
             md%randomize_velocities = .true.
-            do%need_velocities = .true.
+            do_%need_velocities = .true.
             mc%hybrid_opt = 'vv'
-            do%hybrid_mc = .true.
+            do_%hybrid_mc = .true.
             if (rank == 0) &
                  call print_message("Doing a Hamilonian MC calculation, setting&
                  & hybrid_opt = 'vv' ")
@@ -385,8 +385,8 @@ contains
          !! Check if hybrid monte carlo
 
          if (mc%relax) then
-            do%hybrid_mc = .true.
-            do%need_velocities = .true.
+            do_%hybrid_mc = .true.
+            do_%need_velocities = .true.
 
             check = .false.
 
@@ -415,8 +415,8 @@ contains
          do i = 1, mc%n_types
             if (mc%types(i) == "md") then
 
-               do%hybrid_mc = .true.
-               do%need_velocities = .true.
+               do_%hybrid_mc = .true.
+               do_%need_velocities = .true.
 
                if (md%thermostat == "none") then
                   if (rank == 0) write (*, *) '                                       |'
@@ -427,8 +427,8 @@ contains
 
             if (mc%types(i) == "relax") then
 
-               do%hybrid_mc = .true.
-               do%need_velocities = .true.
+               do_%hybrid_mc = .true.
+               do_%need_velocities = .true.
                if (md%optimize == "none") then
                   if (rank == 0) write (*, *) '                                       |'
                   if (rank == 0) write (*, *) 'WARNING: You need to specify an        |  <-- WARNING'

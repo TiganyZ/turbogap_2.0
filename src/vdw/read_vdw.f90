@@ -30,7 +30,7 @@ module read_vdw
    use vdw_types, only: options_vdw_t
    use printing, only: print_error
    use read_utils
-   use printing, only: print_error, print_parameter, print_parameters
+   use printing, only: print_error, print_parameter, print_parameters, print_separator
    use error, only: turbogap_abort
    use read_utils
 
@@ -209,8 +209,8 @@ contains
 
       character*8, intent(in) :: element
       integer, intent(in) :: rank
-      real*8, intent(out) :: C6, R0, alpha0
-      real*8 :: Hartree = 27.211386024367243d0, Bohr = 0.5291772105638411d0
+      real(dp), intent(out) :: C6, R0, alpha0
+      real(dp), parameter :: Hartree = 27.211386024367243d0, Bohr = 0.5291772105638411d0
 
       C6 = 0.d0
       R0 = 0.d0
@@ -248,6 +248,7 @@ contains
          C6 = 185.d0*Hartree*Bohr**6
       else
          if (rank == 0) then
+            call print_separator('-')
             write (*, *) '                                       |'
             write (*, *) 'WARNING: default vdW reference parame- |'
             write (*, *) 'ters not available for element:        |'
@@ -262,7 +263,7 @@ contains
             write (*, *) 'vdw_c6_ref, vdw_r0_ref and             |'
             write (*, *) 'vdw_alpha0_ref in the input file.      |'
             write (*, *) '                                       |'
-            write (*, *) '.......................................|'
+            call print_separator('-')
          end if
       end if
 

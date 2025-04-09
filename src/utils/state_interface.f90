@@ -71,10 +71,10 @@ contains
       integer, intent(in) :: n_sites_supercell
 
       state%n_sites_supercell = n_sites_supercell
-      if (need_velocities) then
-         if (allocated(state%velocities_supercell)) deallocate (state%velocities_supercell)
-         allocate (state%velocities_supercell(1:3, 1:state%n_sites_supercell))
-      end if
+      ! if (need_velocities) then
+      !    if (allocated(state%velocities_supercell)) deallocate (state%velocities_supercell)
+      !    allocate (state%velocities_supercell(1:3, 1:state%n_sites_supercell))
+      ! end if
 
       if (allocated(state%positions_supercell)) deallocate (state%positions_supercell)
       if (allocated(state%species_supercell)) deallocate (state%species_supercell)

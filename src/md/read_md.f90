@@ -293,17 +293,17 @@ contains
 
    end subroutine read_options_md
 
-   subroutine check_options_md(rank, do, md, mc, species_info)
+   subroutine check_options_md(rank, do_, md, mc, species_info)
       integer, intent(in) :: rank
       type(md_t), intent(inout) :: md
       type(mc_t), intent(inout) :: mc
-      type(control_t), intent(inout) :: do
+      type(control_t), intent(inout) :: do_
       type(species_info_t), intent(inout) :: species_info
       logical :: valid_choice
       integer :: i
 
 !   Get masses from database
-      if ((do%md .or. do%mc) .and. .not. species_info%masses_in_input_file) then
+      if ((do_%md .or. do_%mc) .and. .not. species_info%masses_in_input_file) then
          if (rank == 0) then
             write (*, *) '                                       |'
             write (*, *) 'WARNING: you have not provided masses  |  <-- WARNING'
@@ -342,6 +342,7 @@ contains
             write (*, *) '.......................................|'
          end if
       end if
+
    end subroutine check_options_md
 
 end module read_md

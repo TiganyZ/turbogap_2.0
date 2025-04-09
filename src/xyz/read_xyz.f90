@@ -52,7 +52,7 @@ contains
       species_info, &
       rcut_max, &
       state, &
-      do)
+      do_)
 
       implicit none
 
@@ -66,7 +66,7 @@ contains
 
       type(species_info_t), intent(inout) :: species_info
       type(state_t), intent(inout) :: state
-      type(control_t), intent(inout) :: do
+      type(control_t), intent(inout) :: do_
 
       !   Internal variables
       integer, parameter :: xyz_file = 11
@@ -82,7 +82,7 @@ contains
 
       state%indices_prev = state%indices
 
-      if (.not. do%supercell_check_only) then
+      if (.not. do_%supercell_check_only) then
          inquire (file=filename, number=i)
          if (i /= xyz_file) then
             open (unit=xyz_file, file=filename, status="old", action='read')
@@ -91,26 +91,26 @@ contains
                                                !! Read n_sites and property line
          call read_n_sites_properties(xyz_file, iostatus, state, properties)
 
-         if (.not. do%recalculate_supercell) then
+         if (.not. do_%recalculate_supercell) then
                                                          !! Reallocate the state
-            call reallocate_state(state, do%need_velocities, state%n_sites)
+            call reallocate_state(state, do_%need_velocities, state%n_sites)
 
-            call read_xyz_lines(xyz_file, iostatus, do, state, species_info, &
-                                properties, has_velocities, do%need_velocities)
+            call read_xyz_lines(xyz_file, iostatus, do_, state, species_info, &
+                                properties, has_velocities, do_%need_velocities)
 
             !   Randomize state % velocities if state % velocities are not
             !   provided
-            if (do%need_velocities .and. .not. has_velocities) then
-               call reset_velocities(state, thermo)
+            if (do_%need_velocities .and. .not. has_velocities) then
+               call reset_velocities(state, thermo, rank)
             end if
                          !!   Check if there are more structures in the xyz file
             read (xyz_file, *, iostat=iostatus) cjunk
             if (iostatus == 0) then
                backspace (xyz_file)
-               do%repeat_xyz = .true.
+               do_%repeat_xyz = .true.
             else
                close (xyz_file)
-               do%repeat_xyz = .false.
+               do_%repeat_xyz = .false.
             end if
             !! Reset the indices so then we can calculate how many cells we need
             state%indices_prev = 1
@@ -126,9 +126,9 @@ contains
          state%c_box, &
          rcut_max, [.true., .true., .true.], state%indices)
 
-      if ((.not. do%supercell_check_only) &
-          .or. (do%supercell_check_only .and. any(state%indices /= state%indices_prev)) &
-          .or. do%recalculate_supercell) then
+      if ((.not. do_%supercell_check_only) &
+          .or. (do_%supercell_check_only .and. any(state%indices /= state%indices_prev)) &
+          .or. do_%recalculate_supercell) then
 
          if (state%indices(1) > 1 .or. state%indices(2) > 1 .or. state%indices(3) > 1) then
             state%n_sites_supercell = state%n_sites &
@@ -136,19 +136,19 @@ contains
                                       *state%indices(2) &
                                       *state%indices(3)
 
-            call reallocate_state_supercell(state, do%need_velocities, state%n_sites_supercell)
-            call set_supercell(state, do%need_velocities)
+            call reallocate_state_supercell(state, do_%need_velocities, state%n_sites_supercell)
+            call set_supercell(state, do_%need_velocities)
 
          else
-            call set_normal_cell(state, do%need_velocities, do%supercell_check_only)
+            call set_normal_cell(state, do_%need_velocities, do_%supercell_check_only)
          end if
 
          !  FIXME: This is perhaps not the most efficient way to select only one atom, fix in the future
-         if (.not. do%all_atoms) then
+         if (.not. do_%all_atoms) then
             state%n_sites = 1
             dist(1:3) = state%positions(1:3, 1)
-            state%positions(1:3, 1) = state%positions(1:3, do%which_atom)
-            state%positions(1:3, do%which_atom) = dist(1:3)
+            state%positions(1:3, 1) = state%positions(1:3, do_%which_atom)
+            state%positions(1:3, do_%which_atom) = dist(1:3)
          end if
 
       else
@@ -159,7 +159,7 @@ contains
 
    end subroutine read_xyz_file
 
-   subroutine read_xyz_lines(xyz_file, iostatus, do, state, species_info, properties, &
+   subroutine read_xyz_lines(xyz_file, iostatus, do_, state, species_info, properties, &
                              has_velocities, need_velocities)
       integer, intent(in) :: xyz_file
       integer, intent(inout) :: iostatus
@@ -167,7 +167,7 @@ contains
       logical, intent(in) :: need_velocities
       character*1024, intent(in) :: properties
 
-      type(control_t), intent(inout) :: do
+      type(control_t), intent(inout) :: do_
       type(state_t), intent(inout) :: state
       type(species_info_t), intent(inout) :: species_info
       character*8 :: i_char
@@ -188,7 +188,7 @@ contains
                                %masses(i), species_info%masses_from_xyz)
             if (species_info%masses_from_xyz) then
                state%masses(i) = state%masses(i)*103.6426965268d0
-               do%write_masses = .true.
+               do_%write_masses = .true.
             end if
          else
             call read_xyz_line(properties, cjunk1024, i_char, state &

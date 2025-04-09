@@ -31,7 +31,7 @@ module read_gap
    use kinds, only: dp
    use read_utils
    use printing, only: print_message, print_warning, print_note, &
-                       print_debug, print_error, print_parameter
+                       print_debug, print_error, print_parameter, printf_small_message
    use types, only: soap_turbo, gap_2b_t, gap_3b_t, gap_core_pot_t, &
                     input_parameters
    use soap_turbo_compress_module
@@ -44,11 +44,12 @@ contains
                                             !! Read gap parameters from gap_file
    subroutine read_gap_hypers(file_gap, n_soap_turbo, soap_turbo_hypers,&
         & n_distance_2b, distance_2b_hypers, n_angle_3b, angle_3b_hypers,&
-        & n_core_pot, core_pot_hypers, rcut_max, do_prediction, params)
+        & n_core_pot, core_pot_hypers, rcut_max, do_prediction, params, rank)
 
       implicit none
 
 !   Input variables
+      integer, intent(in) :: rank
       type(input_parameters), intent(in) :: params
       logical, intent(in) :: do_prediction
       character(len=*), intent(in) :: file_gap
@@ -758,6 +759,15 @@ contains
       end do
       close (10)
 
+      if (n_soap_turbo > 0 .and. rank == 0) &
+         call printf_small_message("Found  ", n_soap_turbo, " soap_turbo descriptors")
+      if (n_distance_2b > 0 .and. rank == 0) &
+         call printf_small_message("Found ", n_distance_2b, " 2b descriptors")
+      if (n_angle_3b > 0 .and. rank == 0) &
+         call printf_small_message("Found ", n_angle_3b, " 3b descriptors")
+      if (n_core_pot > 0 .and. rank == 0) &
+         call printf_small_message("Found ", n_core_pot, " core_pot descriptors")
+
    end subroutine read_gap_hypers
 
    subroutine read_alphas_and_descriptors(file_desc, file_alphas, n_sparse, descriptor_type, alphas, Qs, cutoff)
@@ -862,7 +872,7 @@ contains
          close (unit_number)
       end if
 
-    end subroutine read_alphas_and_descriptors
+   end subroutine read_alphas_and_descriptors
 
 !**************************************************************************
 end module read_gap

@@ -29,8 +29,8 @@
 module turbogap_main
    use kinds, only: dp
    use read_files, only: read_input_file
-   use control, only: control_t
-   use control_interface
+   use control, only: control_t, perform_t
+   use control_interface, only: decide_read_xyz, decide_randomize_velocities
                                                          !! Importing main types
    use types, only: &
       species_info_t, &
@@ -46,11 +46,13 @@ module turbogap_main
       gap_core_pot_t, &
       exp_data_t
 
+   use calculation, only: allocate_calculation, allocate_calculations
+
                                        !! TODO: Add the routines for mc / md and
                                               !! have them be like the way above
 
    use md_types, only: md_t
-   use md_interface ! , only: perform_md
+   use md_interface, only: reset_velocities
 
    use mc_types, only: mc_t
    use mc_interface ! , only: perform_mc
@@ -110,7 +112,8 @@ contains
 
    subroutine turbogap_run()
                                                    !! Controls for the main loop
-      type(control_t)     :: do
+      type(control_t)     ::  do_
+      type(perform_t)     ::  perform
                                               !! Input parameters read from file
       type(input_parameters) :: params
                                         !! Options for various calculation types
@@ -153,7 +156,11 @@ contains
       type(calculation_t) :: gap_2b
       type(calculation_t) :: gap_3b
       type(calculation_t) :: gap_core_pot
+
+      type(calculation_t) :: pdf
+      type(calculation_t) :: sf
       type(calculation_t) :: xrd
+      type(calculation_t) :: nd
       type(calculation_t) :: xps
       type(calculation_t) :: vdw
 
@@ -211,6 +218,10 @@ contains
 
       real(dp) :: seed
 
+                                                           !! Main loop counters
+      integer :: i_step = -1
+      integer :: n_steps = 0
+
       !*************************************************************************
                                                                      !! MPI Init
       ! FIXME: Move this outside of the main routine
@@ -258,7 +269,7 @@ contains
          mode, &
          species_info, &
          params, &
-         do, &
+         do_, &
          neighbors, &
          thermo, &
          mc, &
@@ -296,16 +307,7 @@ contains
                            n_gap_2b, gap_2b_hypers, &
                            n_gap_3b, gap_3b_hypers, &
                            n_gap_core_pot, gap_core_pot_hypers, &
-                           neighbors%rcut_max, do%prediction, params)
-
-      if (n_gap_soap > 0 .and. rank == 0) &
-         call printf_small_message("Found  ", n_gap_soap, " soap_turbo descriptors")
-      if (n_gap_2b > 0 .and. rank == 0) &
-         call printf_small_message("Found ", n_gap_2b, " 2b descriptors")
-      if (n_gap_3b > 0 .and. rank == 0) &
-         call printf_small_message("Found ", n_gap_3b, " 3b descriptors")
-      if (n_gap_core_pot > 0 .and. rank == 0) &
-         call printf_small_message("Found ", n_gap_core_pot, " core_pot descriptors")
+                           neighbors%rcut_max, do_%prediction, params, rank)
 
       call time_end(time%io)
 
@@ -334,7 +336,21 @@ contains
       ! call broadcast_gap_3b( n_gap_3b, gap_3b_hypers )
       !
       ! call time_end( time % mpi )
-      !
+
+                            !! Setting that we will always do these calculations
+
+      perform%gap_soap = (n_gap_soap > 0)
+      perform%gap_2b = (n_gap_2b > 0)
+      perform%gap_3b = (n_gap_3b > 0)
+      perform%gap_core_pot = (n_gap_core_pot > 0)
+
+      !! Decide whether to do experimental options
+      perform%pdf = do_%pdf
+      perform%sf = do_%sf
+      perform%xrd = do_%xrd
+      perform%nd = do_%nd
+      perform%xps = do_%xps
+
 #endif
 #ifdef _DEBUG
       if (rank == 0) then
@@ -348,9 +364,6 @@ contains
       !*************************************************************************
                                              !! Initialize counters for the loop
 
-      ! call set_md(do, mode, md)
-      ! call set_mc(do, mode, mc)
-
       !*************************************************************************
                                                            !! Starting Main Loop
       ! main_loop: while ( exit_loop == .false ) then
@@ -361,9 +374,85 @@ contains
 #endif
 
       !*************************************************************************
-                                                             !! Reading xyz file
+                                                          !! Deciding what to do
 
       ! TODO: Decide on what to do for this loop
+
+      perform%md_step = do_%md
+      perform%mc_step = (do_%mc .and. (.not. do_%md))
+
+                                                      !! Increment main counters
+      if (perform%md_step) &
+         md%i_step = md%i_step + 1
+
+      if (perform%mc_step) &
+         mc%i_step = mc%i_step + 1
+
+      perform%neighbors = do_%rebuild_neighbors_list
+
+      perform%reallocate = (state%n_sites /= state%n_sites_prev)
+      perform%broadcast = (state%n_sites /= state%n_sites_prev)
+
+      perform%read_xyz = decide_read_xyz(do_, md%i_step, mc%i_step)
+
+      perform%write_xyz = ( &
+                          (do_%md .and. (.not. do_%mc) .and. &
+                           (modulo(md%i_step, do_%write_xyz) == 0)) .or. &
+                          (do_%mc .and. (.not. do_%md) .and. &
+                           (modulo(mc%i_step, do_%write_xyz) == 0)) &
+                          )
+
+      perform%write_thermo = (do_%md .and. &
+                              (modulo(md%i_step, do_%write_thermo) == 0))
+
+      perform%randomize_velocities = decide_randomize_velocities( &
+                                     md%randomize_velocities, &
+                                     perform%md_step, &
+                                     md%i_step, &
+                                     allocated(state%velocities))
+
+      if (rank == 1) then
+         call print_parameter(" perform md_step ", perform%md_step)
+         call print_parameter(" perform mc_step ", perform%mc_step)
+         call print_parameter(" perform nested_step ", perform%nested_step)
+         call print_parameter(" perform randomize_velocities ", perform%randomize_velocities)
+
+         call print_parameter(" perform neighbors ", perform%neighbors)
+
+         call print_parameter(" perform gap_soap ", perform%gap_soap)
+         call print_parameter(" perform gap_2b ", perform%gap_2b)
+         call print_parameter(" perform gap_3b ", perform%gap_3b)
+         call print_parameter(" perform gap_core_pot ", perform%gap_core_pot)
+
+         call print_parameter(" perform exp ", perform%exp)
+
+         call print_parameter(" perform pdf ", perform%pdf)
+         call print_parameter(" perform sf ", perform%sf)
+         call print_parameter(" perform xrd ", perform%xrd)
+         call print_parameter(" perform nd ", perform%nd)
+         call print_parameter(" perform xps ", perform%xps)
+
+         call print_parameter(" perform read_xyz ", perform%read_xyz)
+         call print_parameter(" perform write_xyz ", perform%write_xyz)
+         call print_parameter(" perform write_thermo ", perform%write_thermo)
+         call print_parameter(" perform overwrite ", perform%overwrite)
+
+         call print_parameter(" perform reallocate ", perform%reallocate)
+         call print_parameter(" perform broadcast ", perform%broadcast)
+      end if
+
+      !
+      ! do_%
+
+      ! ! Decide if we need to read the xyz
+
+      ! if (do_%hybrid_mc) then
+      !    if (.not. do_%md) then
+      !       do_%forces = .false.
+      !    else
+      !       do_%forces = .true.
+      !    end if
+      ! end if
 
       ! call decide_what_to_do(  )
 
@@ -374,12 +463,18 @@ contains
 
       ! FIXME: Insert conditional reading here for the loops
 
-      call time_start(time%xyz)
+      if (perform%read_xyz) then
+         call time_start(time%xyz)
 
-      call read_xyz_file(rank, params%atoms_file, thermo, species_info, &
-                         neighbors%rcut_max, state, do)
+         call read_xyz_file(rank, params%atoms_file, thermo, species_info, &
+                            neighbors%rcut_max, state, do_)
 
-      call time_end(time%xyz)
+         call time_end(time%xyz)
+      end if
+
+                                                  !! Randomize velocities if set
+      if (perform%randomize_velocities) &
+         call reset_velocities(state, thermo, rank)
 
 #ifdef _DEBUG
       if (rank == 0) then
@@ -391,13 +486,28 @@ contains
       !*************************************************************************
 
       !*************************************************************************
+                                                              !! Broadcast state
+
+      ! call state_broadcast(state)
+
+#ifdef _DEBUG
+      if (rank == 0) then
+         call print_debug("Finished broadcast state file", "turbogap_main.f90")
+      end if
+#endif
+
+                                                     !! Finished Broadcast state
+      !*************************************************************************
+      !
+      !*************************************************************************
                                                    !! Prepare MPI load splitting
 
       ! FIXME: Insert conditional splitting based on whether the number of atoms
       ! have changed
 
                         !! Set i_beg and i_end which split atoms among MPI tasks
-      call split_tasks(state%n_sites, n_tasks, rank, i_beg, i_end)
+      if (perform%reallocate) &
+         call split_tasks(state%n_sites, n_tasks, rank, i_beg, i_end)
 
 #ifdef _DEBUG
       if (rank == 0) then
@@ -446,18 +556,20 @@ contains
       !!    end do
       !! end do
 
-      call time_start(time%neighbors)
+      if (perform%neighbors) then
+         call time_start(time%neighbors)
 
                                                       !! Build the neighbor list
-      call build_neighbors_list(state, neighbors, do%rebuild_neighbors_list, &
-                                i_beg, i_end, do%timing, rank)
+         call build_neighbors_list(state, neighbors, do_%rebuild_neighbors_list, &
+                                   i_beg, i_end, do_%timing, rank)
 
                                       !! Broadcast neighbors and set j_beg j_end
-      call collect_neighbors(neighbors, do%rebuild_neighbors_list, &
-                             state%n_sites, rank, n_tasks, j_beg, j_end, &
-                             time%mpi)
+         call collect_neighbors(neighbors, do_%rebuild_neighbors_list, &
+                                state%n_sites, rank, n_tasks, j_beg, j_end, &
+                                time%mpi)
 
-      call time_end(time%neighbors)
+         call time_end(time%neighbors)
+      end if
 
 #ifdef _DEBUG
       if (rank == 0) then
@@ -469,11 +581,42 @@ contains
       !*************************************************************************
 
       !*************************************************************************
+                                                  !! Allocate calculation arrays
+
+      if (perform%reallocate) then
+                                                    !! Allocate gap Calculations
+         call allocate_calculations(perform, state%n_sites, do_%forces, &
+                                    total, &
+                                    gap_soap, &
+                                    gap_2b, &
+                                    gap_3b, &
+                                    gap_core_pot, &
+                                    pdf, &
+                                    sf, &
+                                    xrd, &
+                                    nd, &
+                                    xps, &
+                                    vdw, &
+                                    this_total, &
+                                    this_gap_soap, &
+                                    this_gap_2b, &
+                                    this_gap_3b, &
+                                    this_gap_core_pot, &
+                                    this_xrd, &
+                                    this_xps, &
+                                    this_vdw)
+
+      end if
+
+                                       !! Finished allocation calculation arrays
+      !*************************************************************************
+
+      !*************************************************************************
                                                                  !! get_gap_soap
 
       ! call time_start( time % soap )
       !
-      ! call calculate_soap( do, state, neighbors, gap_soap_hypers, gap_soap)
+      ! call calculate_soap( do_, state, neighbors, gap_soap_hypers, gap_soap)
       !
       ! do i = 1, n_soap
       !
@@ -687,7 +830,7 @@ contains
 
       if (rank == 0) then
          call time_end(time%total)
-         call print_times(time, do)
+         call print_times(time, do_)
          call print_end_of_execution()
       end if
 

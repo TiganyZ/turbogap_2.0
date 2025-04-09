@@ -35,6 +35,7 @@ SRC := kinds.f90 \
        timing.f90 \
        functions.f90 \
        splines.f90 \
+       calculation.f90 \
        misc.f90 \
        \
        md_types.f90 \

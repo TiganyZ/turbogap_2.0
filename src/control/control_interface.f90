@@ -46,12 +46,12 @@ contains
 
    !----------------------------------------
 
-  ! subroutine determine_simulation( do, mode )
+  ! subroutine determine_simulation( do_, mode )
   !   character*8, intent(in) :: mode
-  !   type( control_t ), intent(inout) :: do
+  !   type( control_t ), intent(inout) :: do_$
 
   !   if ( mode == "mc" )then
-  !      if ( do% )
+  !      if ( do_% )
 
 
 
@@ -68,19 +68,59 @@ contains
   end subroutine check_repeat_xyz_and_md
 
 
+  pure function decide_read_xyz( do_, md_i_step, mc_i_step ) result( decision )
+    type( control_t ), intent(in) :: do_
+    integer, intent(in) :: md_i_step
+    integer, intent(in) :: mc_i_step
+    logical :: decision
+
+    decision = ( do_%prediction .and. &
+           ( &
+             ( do_%md .and. md_i_step == 0 .and. (.not. do_%mc) ) .or.  &
+             ( do_%mc .and. mc_i_step == 0 ) .or.  &
+             ( do_%repeat_xyz )  &
+              ) &
+      )
+  end function decide_read_xyz
+
+  pure function decide_md( do_) result(decision)
+    type( control_t ), intent(in) :: do_
+    logical :: decision
+    decision = ( do_%md )
+  end function decide_md
+
+  pure function decide_mc( do_) result(decision)
+    type( control_t ), intent(in) :: do_
+    logical :: decision
+    decision = ( do_%mc .and. ( .not. do_%md ) )
+  end function decide_mc
+
+  pure function decide_randomize_velocities( md_randomize_velocities,&
+       & perform_md_step, md_i_step, allocated_velocities) result(decision)
+    logical, intent(in) :: md_randomize_velocities
+    logical, intent(in) :: perform_md_step
+    integer, intent(in) :: md_i_step
+    logical, intent(in) :: allocated_velocities
+    logical :: decision
+
+    decision = ( perform_md_step .and. md_randomize_velocities .and. &
+         (md_i_step == 0) .and. allocated_velocities )
+
+  end function decide_randomize_velocities
 
 
-   pure function check_exit(do, md, mc) result(leave_loop)
-      type(control_t), intent(in)   :: do
+
+   pure function check_exit(do_, md, mc) result(leave_loop)
+      type(control_t), intent(in)   :: do_
       type(md_t), intent(in)    :: md
       type(mc_t), intent(in)    :: mc
       logical :: leave_loop
 
-      if (do%md .and. do%mc) then
+      if (do_%md .and. do_%mc) then
          leave_loop = check_exit_md(md) .and. check_exit_mc(mc)
-      else if (do%md) then
+      else if (do_%md) then
          leave_loop = check_exit_md(md)
-      else if (do%mc) then
+      else if (do_%mc) then
          leave_loop = check_exit_mc(mc)
       else
          leave_loop = .false.

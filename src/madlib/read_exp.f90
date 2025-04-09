@@ -35,7 +35,7 @@ module read_exp
 
 contains
 
-   subroutine read_options_exp(keyword, unit, iostatus, do, xrd_opt, sf_opt, pdf_opt, n_species, species_types)
+   subroutine read_options_exp(keyword, unit, iostatus, do_, xrd_opt, sf_opt, pdf_opt, n_species, species_types)
       ! Input
       character*1024, intent(in) :: keyword
       integer, intent(in) :: unit
@@ -99,7 +99,7 @@ contains
 
       else if (keyword == 'do_xps') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%xps
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%xps
          call check_iostatus(iostatus, keyword)
 
       else if (keyword == 'xps_e_min') then
@@ -127,15 +127,15 @@ contains
          call check_iostatus(iostatus, keyword)
       else if (keyword == 'print_lp_forces') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%print_lp_forces
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%print_lp_forces
          call check_iostatus(iostatus, keyword)
       else if (keyword == 'print_vdw_forces') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%print_vdw_forces
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%print_vdw_forces
          call check_iostatus(iostatus, keyword)
       else if (keyword == 'exp_similarity_type') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%exp_similarity_type
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%exp_similarity_type
          call check_iostatus(iostatus, keyword)
       else if (keyword == 'xrd_alpha') then
          backspace (10)
@@ -190,12 +190,12 @@ contains
 
       else if (keyword == 'do_pair_distribution') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%pair_distribution
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%pair_distribution
          call check_iostatus(iostatus, keyword)
 
       else if (keyword == 'do_structure_factor') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%structure_factor
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%structure_factor
          call check_iostatus(iostatus, keyword)
          if (params%do_structure_factor) then
             params%do_pair_distribution = .true.
@@ -208,7 +208,7 @@ contains
 
       else if (keyword == 'do_xrd') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%xrd
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%xrd
          call check_iostatus(iostatus, keyword)
 
          if (params%do_xrd) then
@@ -218,7 +218,7 @@ contains
 
       else if (keyword == 'do_nd') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%nd
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%nd
          call check_iostatus(iostatus, keyword)
 
          if (params%do_nd) then
@@ -228,17 +228,17 @@ contains
 
       else if (keyword == 'do_exp') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%exp
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%exp
          call check_iostatus(iostatus, keyword)
 
       else if (keyword == 'n_exp') then
          backspace (10)
-         read (10, *, iostat=iostatus) cjunk, cjunk, do%n_exp
+         read (10, *, iostat=iostatus) cjunk, cjunk, do_%n_exp
          call check_iostatus(iostatus, keyword)
-         allocate (params%exp_data(1:do%n_exp))
-         allocate (params%exp_energy_scales(1:do%n_exp))
-         allocate (params%exp_energy_scales_initial(1:do%n_exp))
-         allocate (params%exp_energy_scales_final(1:do%n_exp))
+         allocate (params%exp_data(1:do_%n_exp))
+         allocate (params%exp_energy_scales(1:do_%n_exp))
+         allocate (params%exp_energy_scales_initial(1:do_%n_exp))
+         allocate (params%exp_energy_scales_final(1:do_%n_exp))
 
          ! Turning on exp prediction
          params%do_exp = .true.
@@ -246,7 +246,7 @@ contains
       else if (keyword == "exp_labels") then
          backspace (10)
          read (10, *, iostat=iostatus) cjunk, cjunk, &
-            (params%exp_data(nw)%label, nw=1, do%n_exp)
+            (params%exp_data(nw)%label, nw=1, do_%n_exp)
          call check_iostatus(iostatus, keyword)
          do nw = 1, params%n_exp
             call upper_to_lower_case(params%exp_data(nw)%label)
@@ -256,7 +256,7 @@ contains
 
             else if (trim(params%exp_data(nw)%label) == "xrd") then
                xrd_opt%xrd_idx = nw
-               do%valid_xrd = .true.
+               do_%valid_xrd = .true.
                if (rank == 0) write (*, *) ' - Valid exp. XRD found                |'
                ! Must be set to true to find the partial structure factors
                ! params%pair_distribution_partial = .true.
@@ -430,7 +430,7 @@ contains
    end subroutine read_options_exp
 
    subroutine check_options_exp(do)
-      type(control_t), intent(inout) :: do
+      type(control_t), intent(inout) :: do_$
 
 !   Experimental prediction checks
       if (params%do_exp) then

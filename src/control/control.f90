@@ -34,6 +34,41 @@
 module control
    implicit none
 
+   !****************************************************************************
+              !! This is the logical which actually controls what is done in the
+              !! main loop, as there are some long expressions when just using
+              !! the control type
+   type perform_t
+      logical :: md_step = .false.
+      logical :: mc_step = .false.
+      logical :: nested_step = .false.
+      logical :: randomize_velocities = .false.
+
+      logical :: neighbors = .false.
+
+      logical :: gap_soap = .false.
+      logical :: gap_2b = .false.
+      logical :: gap_3b = .false.
+      logical :: gap_core_pot = .false.
+
+      logical :: exp = .false.
+
+      logical :: pdf = .false.
+      logical :: sf = .false.
+      logical :: xrd = .false.
+      logical :: nd = .false.
+      logical :: xps = .false.
+
+      logical :: read_xyz = .false.
+      logical :: write_xyz = .false.
+      logical :: write_thermo = .false.
+      logical :: overwrite = .false.
+
+      logical :: reallocate = .false.
+      logical :: broadcast = .false.
+   end type perform_t
+
+   !****************************************************************************
    type control_t
        !! Type which contains logicals for controlling the flow of the program.
 
@@ -43,17 +78,21 @@ module control
       logical :: mc = .false.
       logical :: exp = .false.
       logical :: nested_sampling = .false.
+      logical :: estat = .false.
+
+                                                      !! Experimental procedures
+
+      logical :: xps = .false.
+      logical :: nd = .false.
+      logical :: xrd = .false.
+      logical :: pdf = .false.
+      logical :: sf = .false.
+
       logical :: timing = .false.
 
                                                                !! Hamiltonian MC
       logical :: mc_hamiltonian = .false.
 
-                                                      !! Experimental procedures
-
-      logical :: nd = .false.
-      logical :: xrd = .false.
-      logical :: pdf = .false.
-      logical :: sf = .false.
                                                        !! Forces and Derivatives
       logical :: forces = .false.
       logical :: derivatives = .false.
@@ -76,7 +115,7 @@ module control
       logical :: hybrid_mc = .false.
       logical :: need_velocities = .true.
                                                                    !! XYZ options
-      logical :: repeat_xyz = .false.
+      logical :: repeat_xyz = .true.
       logical :: recalculate_supercell = .false.
       logical :: supercell_check_only = .false.
       integer :: which_atom = 0
