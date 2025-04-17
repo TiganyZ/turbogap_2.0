@@ -86,11 +86,6 @@ module exp_types
       integer :: nd = -1
    end type exp_indexes_t
 
-   type lp_indexes_t
-      integer :: xps = -1
-      integer :: vdw = -1
-      integer :: estat = -1
-   end type lp_indexes_t
    !****************************************************************************
                                       !! General experimental observable options
    type general_exp_t

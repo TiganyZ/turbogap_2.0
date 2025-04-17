@@ -44,8 +44,8 @@ contains
       real(dp), intent(inout), allocatable, target :: local_properties_cart_der(:, :, :)
       real(dp), intent(inout), allocatable, target :: this_local_properties_cart_der(:, :, :)
 
-      real(dp), intent(inout), contiguous, pointer :: this_local_properties_pt(:)
-      real(dp), intent(inout), contiguous, pointer :: this_local_properties_cart_der_pt(:, :)
+      real(dp), intent(inout), contiguous, pointer :: this_local_properties_pt(:, :)
+      real(dp), intent(inout), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
 
       if (reallocate) then
          if (allocated(local_properties)) then
@@ -75,8 +75,8 @@ contains
             local_properties_cart_der = 0.0_dp
          end if
 
-         this_local_properties_cart_der_pt => this_local_properties_cart_der(3,&
-              & n_atom_pairs, n_local_properties)
+         this_local_properties_cart_der_pt => this_local_properties_cart_der(1:3,&
+              & 1:n_atom_pairs, 1:n_local_properties)
       end if
    end subroutine reset_local_properties
 
@@ -93,7 +93,7 @@ contains
                                  this_gap_soap, &
                                  soap_cart_der, &
                                  n_local_properties, &
-                                 local_property_indexes, &
+                                 local_properties_indexes, &
                                  local_properties, &
                                  this_local_properties, &
                                  local_properties_cart_der, &
@@ -123,8 +123,8 @@ contains
       real(dp), intent(inout), allocatable, target :: this_local_properties_cart_der(:, :, :)
 
                                             !! Pointers for the local properties
-      real(dp), contiguous, pointer :: this_local_properties_pt(:)
-      real(dp), contiguous, pointer :: this_local_properties_cart_der_pt(:, :)
+      real(dp), contiguous, pointer :: this_local_properties_pt(:, :)
+      real(dp), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
 
       type(split_t), intent(in)          :: split
 
@@ -136,8 +136,8 @@ contains
       type(calculation_t), intent(inout) :: gap_soap
       type(calculation_t), intent(inout) :: this_gap_soap
 
-      real(dp) :: soap(:, :)
-      real(dp) :: soap_cart_der(:, :, :)
+      real(dp), allocatable :: soap(:, :)
+      real(dp), allocatable :: soap_cart_der(:, :, :)
 
       integer :: this_i_beg
       integer :: this_i_end
@@ -171,13 +171,13 @@ contains
                                      neighbors%n_atom_pairs, &
                                      neighbors%n_atom_pairs_prev, &
                                      n_local_properties, &
-                                     local_properties_indexes, &
                                      local_properties, &
                                      this_local_properties, &
                                      this_local_properties_pt, &
                                      local_properties_cart_der, &
                                      this_local_properties_cart_der, &
                                      this_local_properties_cart_der_pt)
+
       end if
 
       n_lp_count = 0 ! This counts the local properties
@@ -269,7 +269,7 @@ contains
                               this_gap_soap%forces, &
                               this_local_properties_pt, &
                               this_local_properties_cart_der_pt, &
-                              local_property_indexes, &
+                              local_properties_indexes, &
                               this_i_beg, &
                               this_i_end, &
                               this_j_beg, &
@@ -297,7 +297,7 @@ contains
             !*******************************************************************
                                                                    !! Write SOAP
             if (perform%write_xyz .and. do_%write_soap) then
-               call write_soap(rank, perform%overwrite, state%n_sites, i, n_soap_turbo, soap, &
+               call write_soap(rank, perform%overwrite, state%n_sites, i, n_soap, soap, &
                                soap_cart_der, do_%write_derivatives, der_neighbors, &
                                der_neighbors_list)
             end if
@@ -347,8 +347,8 @@ contains
       real(dp), intent(inout), allocatable :: soap(:, :)
       real(dp), intent(inout), allocatable :: soap_cart_der(:, :, :)
 
-      integer, intent(in), allocatable :: der_neighbors(:)
-      integer, intent(in), allocatable :: der_neighbors_list(:)
+      integer, intent(inout), allocatable :: der_neighbors(:)
+      integer, intent(inout), allocatable :: der_neighbors_list(:)
 
       integer :: n_soap
       integer :: n_sites_this

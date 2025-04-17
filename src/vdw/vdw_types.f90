@@ -31,6 +31,7 @@ module vdw_types
    implicit none
 
    type options_vdw_t
+      logical               :: valid = .false.
       real(dp), allocatable :: vdw_c6_ref(:)
       real(dp), allocatable :: vdw_r0_ref(:)
       real(dp), allocatable :: vdw_alpha0_ref(:)

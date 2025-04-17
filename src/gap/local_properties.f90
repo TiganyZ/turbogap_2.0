@@ -29,16 +29,22 @@
 module local_prop
    use kinds, only: dp
    use control, only: control_t
-   use exp_types, only: exp_data_t, general_exp_t
+   use types, only: soap_turbo
+   use exp_types, only: exp_data_t, exp_indexes_t, xps_t
+   use vdw_types, only: options_vdw_t
    use printing, only: print_message, print_error
+   implicit none
+
+   type lp_indexes_t
+      integer :: core_electron_be = -1
+      integer :: hirshfeld_v = -1
+      integer :: charges = -1
+   end type lp_indexes_t
 
 contains
 
    subroutine local_property_predict(soap, Qs, alphas, V0, delta, zeta, V, &
                                      do_derivatives, soap_cart_der, n_neigh, V_der)
-
-      implicit none
-
 !   Input variables
       real(dp), intent(in) :: soap(:, :), Qs(:, :), alphas(:), V0, delta, zeta, soap_cart_der(:, :, :)
       integer, intent(in) :: n_neigh(:)
@@ -142,8 +148,8 @@ contains
 
    subroutine get_irreducible_local_properties(rank, do_, n_local_properties, &
                                                n_local_properties_tot, n_soap_turbo, soap_turbo_hypers, &
-                                               local_property_labels, local_property_indexes, exp_data, &
-                                               exp_indexes)
+                                               local_property_labels, local_property_indexes, n_exp, exp_data, &
+                                               exp_indexes, lp_indexes, options_vdw, options_xps)
 
 ! (params, n_local_properties_tot, n_soap_turbo, soap_turbo_hypers,
       ! local_property_labels, local_property_labels_temp,
@@ -152,34 +158,37 @@ contains
 
       implicit none
 
-      integer, intent(in) :: rank
-      type(control_t), intent(inout) :: do_
+      integer, intent(out)                         :: n_local_properties
 
-      type(exp_data_t), intent(inout) :: exp_data(:)
-      type(exp_indexes_t), intent(inout) :: exp_indexes
-      type(xps_t), intent(inout) :: options_xps
-      type(vdw_t), intent(inout) :: options_vdw
+      integer, intent(in)                          :: rank
 
-      integer, intent(out) :: n_local_properties
-
-      type(input_parameters), intent(inout) :: params
-      integer, intent(in) :: n_soap_turbo
-      integer, intent(inout) :: n_local_properties_tot
+      integer, intent(inout)                       :: n_local_properties_tot
+      integer, intent(in)                          :: n_soap_turbo
       type(soap_turbo), allocatable, intent(inout) :: soap_turbo_hypers(:)
-      character*1024, allocatable, intent(inout) ::  local_property_labels(:)
-      character*1024, allocatable :: local_property_labels_temp(:), &
-                                     local_property_labels_temp2(:)
-      integer, allocatable, intent(inout) :: local_property_indexes(:)
-      integer, intent(inout) :: vdw_lp_index, core_be_lp_index, xps_idx
-      logical, intent(inout) :: valid_vdw, valid_xps
-      logical :: label_in_list = .false.
+
+      type(control_t), intent(inout)               :: do_
+
+      integer, intent(in) :: n_exp
+      type(exp_data_t), intent(inout)              :: exp_data(:)
+      type(exp_indexes_t), intent(inout)           :: exp_indexes
+      type(lp_indexes_t), intent(inout)            :: lp_indexes
+
+      type(xps_t), intent(inout)                   :: options_xps
+      type(options_vdw_t), intent(inout)                   :: options_vdw
+
+      character*1024, allocatable, intent(inout)   :: local_property_labels(:)
+      integer, allocatable, intent(inout)          :: local_property_indexes(:)
+
+      logical                                      :: label_in_list = .false.
+      character*1024, allocatable                  :: local_property_labels_temp(:)
+      character*1024, allocatable                  :: local_property_labels_temp2(:)
       integer :: i, j, i2, j2, k, k2, nprop, length
 
       n_local_properties_tot = 0
       i2 = 1 ! using this as a counter for the labels
       do j = 1, n_soap_turbo
          if (soap_turbo_hypers(j)%has_local_properties) then
-            ! This property has the labels of the quantities to
+            ! This property has the labels l the quantities to
             ! compute. We must specify the number of local properties, for the sake of coding simplicity
 
             n_local_properties_tot = n_local_properties_tot + soap_turbo_hypers(j)%n_local_properties
@@ -266,13 +275,14 @@ contains
 
                   local_property_indexes(j) = i
 
-                  call check_local_property("hirshfeld_v", vdw_lp_index, valid_vdw, &
-                                            i, j, n_soap_turbo, soap_turbo_hypers, do_)
+                  call check_local_property("hirshfeld_v", lp_indexes%hirshfeld_v, options_vdw%valid, &
+                                            i, j, n_soap_turbo, soap_turbo_hypers, do_, local_property_labels)
 
                   call check_local_property_connect_to_exp("core_electron_be", &
-                                                           core_electron_lp_index, "xps", xps_idx, valid_xps, &
+                                                           lp_indexes%core_electron_be, "xps", &
+                                                           exp_indexes%xps, options_xps%valid, &
                                                            local_property_labels, i, j, n_soap_turbo, &
-                                                           soap_turbo_hypers, do_, exp_options)
+                                                           soap_turbo_hypers, do_, n_exp, exp_data)
 
                end if
             end do
@@ -292,7 +302,7 @@ contains
    end subroutine get_irreducible_local_properties
 
    subroutine check_local_property(property_name, property_index, valid_property, &
-                                   i, j, n_soap_turbo, soap_turbo_hypers, do_)
+                                   i, j, n_soap_turbo, soap_turbo_hypers, do_, local_property_labels)
 
       character(len=*), intent(in) :: property_name
       integer, intent(inout) :: property_index
@@ -304,6 +314,7 @@ contains
       integer, intent(in) :: n_soap_turbo
       type(soap_turbo), allocatable, intent(inout) :: soap_turbo_hypers(:)
 
+      character*1024, allocatable, intent(inout)   :: local_property_labels(:)
       type(control_t), intent(inout) :: do_
 
       integer :: k2
@@ -328,13 +339,14 @@ contains
 
    subroutine check_local_property_connect_to_exp(property_name, property_index, exp_name, exp_index, valid_exp, &
                                                   local_property_labels, i, j, n_soap_turbo, soap_turbo_hypers, do_, &
-                                                  exp_options)
+                                                  n_exp, exp_data)
 
       character(len=*), intent(in) :: property_name
       integer, intent(inout) :: property_index
       character(len=*), intent(in) :: exp_name
       integer, intent(inout) :: exp_index
       logical, intent(inout) :: valid_exp
+      integer, intent(in) :: n_exp
 
       integer, intent(in) :: i
       integer, intent(in) :: j
@@ -346,19 +358,19 @@ contains
 
       type(control_t), intent(inout) :: do_
 
-      type(exp_options_t), intent(inout) :: exp_options
+      type(exp_data_t), intent(inout)              :: exp_data(:)
 
       integer :: k2
       integer :: i2
       integer :: k
 
-      if (trim(local_property_labels(j)) == name) then
+      if (trim(local_property_labels(j)) == property_name) then
          property_index = i
 
          ! Check if there is experimental data for one to do xps fitting
-         do i2 = 1, exp_options%n_exp
-            if ((trim(exp_options%exp_data(i2)%label) == exp_name .and. &
-                 .not. (trim(exp_options%exp_data(i2)%file_data) == "none"))) then
+         do i2 = 1, n_exp
+            if ((trim(exp_data(i2)%label) == exp_name .and. &
+                 .not. (exp_data(i2)%n_data > 0))) then
                valid_exp = .true.
                exp_index = i2
                do k2 = 1, n_soap_turbo

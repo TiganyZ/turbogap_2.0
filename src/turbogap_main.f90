@@ -47,6 +47,9 @@ module turbogap_main
       gap_core_pot_t !, &
    !exp_data_t
 
+   use exp_types, only: exp_input_t, exp_data_t, exp_indexes_t, pdf_t, sf_t, xrd_t, nd_t, xps_t
+   use local_prop, only: lp_indexes_t, get_irreducible_local_properties
+
    use calculation, only: allocate_calculations, reset_calculations
 
                                        !! TODO: Add the routines for mc / md and
@@ -130,12 +133,17 @@ contains
       type(md_t)     :: md
       type(mc_t)     :: mc
       type(options_vdw_t)     :: options_vdw
-      !type(options_xps_t)         :: options_xps
-      !type(options_xrd_t)         :: options_xrd
-      !type(options_pdf_t)         :: options_pdf
-      !type(options_sf_t)          :: options_sf
-      !type(options_nd_t)          :: options_nd
-      !type(options_exp_t)         :: options_exp
+
+      type(xps_t)         :: options_xps
+      type(xrd_t)         :: options_xrd
+      type(pdf_t)         :: options_pdf
+      type(sf_t)          :: options_sf
+      type(nd_t)          :: options_nd
+      type(exp_input_t)   :: options_exp
+      type(exp_data_t), allocatable    :: exp_data(:)
+
+      type(exp_indexes_t) :: exp_indexes
+      type(lp_indexes_t) :: lp_indexes
 
                                                 !! Dynamical state of the system
       type(state_t)              :: state
@@ -190,6 +198,9 @@ contains
                                                              !! Local properties
       ! REVIEW: Make local properties into another type?
       integer :: n_local_properties = 0
+      integer :: n_local_properties_tot = 0
+      integer, allocatable          :: local_property_indexes(:)
+      character*1024, allocatable   :: local_property_labels(:)
       real(dp), allocatable, target :: local_properties(:, :)
       real(dp), allocatable, target :: local_properties_cart_der(:, :, :)
       real(dp), allocatable, target :: this_local_properties(:, :)
@@ -285,6 +296,12 @@ contains
          mc, &
          md, &
          options_vdw, &
+         options_exp, exp_data, &
+         options_pdf, &
+         options_sf, &
+         options_xrd, &
+         options_nd, &
+         options_xps, &
          rank)
 
       call time_end(time%io)
@@ -319,9 +336,10 @@ contains
                            n_gap_core_pot, gap_core_pot_hypers, &
                            neighbors%rcut_max, do_%prediction, params, rank)
 
-      call get_irreducible_local_properties(params, n_local_properties_tot, n_soap_turbo, soap_turbo_hypers, &
-                           local_property_labels, local_property_labels_temp, local_property_labels_temp2, local_property_indexes, &
-                                            valid_vdw, vdw_lp_index, core_be_lp_index, valid_xps, xps_idx)
+      call get_irreducible_local_properties(rank, do_, n_local_properties, &
+                                            n_local_properties_tot, n_gap_soap, gap_soap_hypers, &
+                                            local_property_labels, local_property_indexes, options_exp%n_exp, exp_data, &
+                                            exp_indexes, lp_indexes, options_vdw, options_xps)
 
       call time_end(time%io)
 
@@ -358,9 +376,8 @@ contains
       perform%gap_3b = (n_gap_3b > 0)
       perform%gap_core_pot = (n_gap_core_pot > 0)
 
-      if (perform%gap_soap) then
-         perform%local_properties = any(soap_turbo_hypers(:)%has_local_properties)
-      end if
+      if (perform%gap_soap) &
+         perform%local_properties = any(gap_soap_hypers(:)%has_local_properties)
 
       !! Decide whether to do experimental options
       perform%pdf = do_%pdf
@@ -632,9 +649,9 @@ contains
       !*************************************************************************
                                                                  !! get_gap_soap
 
-      call time_start(time%soap)
+      call time_start(time%gap_soap)
 
-      call time_end(time%soap)
+      call time_end(time%gap_soap)
       !
       ! call calculate_soap( do_, state, neighbors, gap_soap_hypers, gap_soap)
       !

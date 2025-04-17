@@ -48,6 +48,9 @@ module read_files
    use vdw_types, only: options_vdw_t
    use read_vdw, only: read_options_vdw, check_options_vdw
 
+   use exp_types, only: exp_input_t, exp_data_t, exp_indexes_t, pdf_t, sf_t, xrd_t, nd_t, xps_t
+   use read_exp, only: read_exp_options
+
    use timing, only: time_start, time_end
 
    use printing, only: print_message, print_warning, print_note, &
@@ -70,6 +73,8 @@ contains
       mc, &
       md, &
       options_vdw, &
+      exp_opt, exp_data, &
+      pdf_opt, sf_opt, xrd_opt, nd_opt, xps_opt, &
       rank)
 
       implicit none
@@ -90,6 +95,15 @@ contains
       type(input_parameters), intent(inout) :: params
       type(neighbors_t), intent(inout)      :: neighbors
       type(thermo_t), intent(inout)         :: thermo
+
+      type(exp_input_t), intent(inout) :: exp_opt
+      type(exp_data_t), allocatable, intent(inout) ::  exp_data(:)
+
+      type(pdf_t), intent(inout) :: pdf_opt
+      type(sf_t), intent(inout) :: sf_opt
+      type(xrd_t), intent(inout) :: xrd_opt
+      type(nd_t), intent(inout) :: nd_opt
+      type(xps_t), intent(inout) :: xps_opt
 
       !   Internal variables
                                                                       !! IO unit
@@ -202,6 +216,12 @@ contains
             call read_options_vdw(input, iostatus, rank, keyword, options_vdw,&
                  & keyword_found, error_flag, species_info%n_species,&
                  & species_info%species_types)
+            if (keyword_found) continue
+
+            call read_exp_options(input, iostatus, rank, keyword, &
+                                  keyword_found, do_, &
+                                  exp_opt, exp_data, &
+                                  pdf_opt, sf_opt, xrd_opt, nd_opt, xps_opt)
             if (keyword_found) continue
 
             ! call read_options_exp(input, iostatus, keyword, options_vdw, keyword_found, &

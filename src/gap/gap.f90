@@ -29,6 +29,7 @@
 module gap
    use kinds, only: dp
    use splines
+   use timing, only: time_start, time_end
    implicit none
 
 contains
