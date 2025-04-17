@@ -29,6 +29,7 @@
 module gap
    use kinds, only: dp
    use splines
+   implicit none
 
 contains
 
@@ -44,7 +45,6 @@ contains
       real(dp), intent(in) :: soap_der(:, :, :)
       real(dp), intent(in) :: alphas(:)
       real(dp), intent(in) :: delta
-      real(dp), intent(in) :: Qs(:, :)
       real(dp), intent(in) :: Qs(:, :)
       real(dp), intent(in) :: e0
       real(dp), intent(in) :: zeta0
@@ -63,7 +63,7 @@ contains
       real(dp), allocatable :: kernels(:, :)
       real(dp), allocatable :: kernels_der(:, :)
       real(dp), allocatable :: Qss(:, :)
-      real(dp), allocatable :: Qs_copy(:, :), this_Qss(:)
+      real(dp), allocatable :: Qs_copy(:, :)
       real(dp), allocatable :: this_Qss(:)
       real(dp), allocatable :: kernels_copy(:, :)
 
@@ -72,6 +72,8 @@ contains
       real(dp) :: time3
       real(dp) :: energies_time
       real(dp) :: forces_time
+      real(dp) :: time_energies(3)
+      real(dp) :: time_forces(3)
       real(dp) :: zeta
       real(dp) :: this_force(1:3)
 
@@ -101,6 +103,8 @@ contains
 
 !   Energies
       if (do_timing) then
+         time_energies = 0.0_dp
+         time_forces = 0.0_dp
          call time_start(time_energies)
          call cpu_time(time1)
          time3 = time1

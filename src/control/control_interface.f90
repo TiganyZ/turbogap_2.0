@@ -109,6 +109,28 @@ contains
   end function decide_randomize_velocities
 
 
+  pure function decide_write_xyz( do_, md, mc) result(decision)
+    type( control_t ), intent(in) :: do_
+    type( md_t ), intent(in) :: md
+    type( mc_t ), intent(in) :: mc
+    logical :: decision
+    decision = ( &
+                          (do_%md .and. (.not. do_%mc) .and. &
+                           (modulo(md%i_step, do_%write_xyz) == 0)) .or. &
+                          (do_%mc .and. (.not. do_%md) .and. &
+                           (modulo(mc%i_step, do_%write_xyz) == 0)) &
+                          )
+  end function decide_write_xyz
+
+  pure function decide_write_thermo( do_, md) result(decision)
+    type( control_t ), intent(in) :: do_
+    type( md_t ), intent(in) :: md
+    logical :: decision
+    decision = (do_%md .and. &
+         (modulo(md%i_step, do_%write_thermo) == 0))
+  end function decide_write_thermo
+
+
 
    pure function check_exit(do_, md, mc) result(leave_loop)
       type(control_t), intent(in)   :: do_

@@ -30,13 +30,10 @@ module gap_interface
    use kinds, only: dp
    use soap_turbo_desc
    use gap
-   use read_files
    use local_prop
-   use types, only: local_property_soap_turbo
+   use control, only: control_t
+   use types, only: state_t, neighbors_t, soap_turbo, local_property_soap_turbo
 contains
-
-   subroutine calculate_gap_soap(state, neighbors, soap)
-   end subroutine calculate_gap_soap
 
 !**************************************************************************
    subroutine get_gap_soap(n_total_sites, n_sites0, n_neigh0, neighbors_list0, n_species, species_types, &

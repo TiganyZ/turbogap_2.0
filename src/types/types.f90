@@ -34,6 +34,32 @@ module types
   !! State is the main state of the program, which contains the positions,
   !! velocities and forces which are used for the specific routines.
 
+   !****************************************************************************
+                                                                !! General types
+
+   ! These is the type for the miscellaneous input parameters which don't fit
+   ! into any other category
+   type input_parameters
+
+                                                          !! Input files to read
+      character*1024           :: atoms_file = 'atoms.xyz'
+      character*1024           :: pot_file = "none"
+                                                                  !! Random Seed
+      integer                  :: seed = -1
+
+                               !! Maximum Gb/core for batching soap calculations
+      real(dp)                 :: max_GBytes_per_process = 1.0_dp
+
+                                                            !! Neighbors buffers
+      real(dp)                 :: core_pot_cutoff = 1.0_dp
+      real(dp)                 :: core_pot_buffer = 0.0_dp
+
+                                   !! Number of local properties for convenience
+
+      logical                  :: all_atoms = .true.
+
+   end type input_parameters
+
    type species_info_t
                                                           !! Species Information
       integer                  :: n_species
@@ -51,7 +77,10 @@ module types
    type neighbors_t
                                                          !! Neighbor information
       integer :: n_neigh_max = 100
+      ! Local number of atom pairs
       integer :: n_atom_pairs = 0
+      integer :: n_atom_pairs_prev = 0
+      ! Global number of atom pairs
       integer :: n_atom_pairs_total = 0
       real(dp) :: rcut_max = 4.0_dp
       real(dp) :: neighbors_buffer = 0.0_dp
@@ -67,6 +96,7 @@ module types
       integer, allocatable  :: neighbors_list(:)
       integer, allocatable  :: neighbors_list_temp(:)
       integer, allocatable  :: n_atom_pairs_by_rank(:)
+      integer, allocatable  :: n_atom_pairs_by_rank_prev(:)
       logical, allocatable  :: do_list(:)
    end type neighbors_t
 
@@ -111,6 +141,14 @@ module types
       real(dp)    :: instant_temp = 0.0_dp
    end type state_t
 
+                          !! Type for splitting atoms/neighbors to mpi processes
+   type split_t
+      integer :: i_beg
+      integer :: i_end
+      integer :: j_beg
+      integer :: j_end
+   end type split_t
+
    type calculation_t
      !! Type for generic calculation. Used for any calculation
      !!   type.such as soap, 2b, 3b, xps etc
@@ -134,6 +172,11 @@ module types
       real(dp) :: gpu = 0.0_dp
    end type memory_t
 
+                                                         !! End of General types
+   !****************************************************************************
+
+   !****************************************************************************
+                                                             !! Descriptor types
    type local_property_soap_turbo
       real*8, allocatable :: Qs(:, :), alphas(:), cutoff(:)
       real*8              :: zeta, delta, V0
@@ -232,30 +275,28 @@ module types
       character*8 :: species1, species2
    end type gap_core_pot_t
 
-   type exp_data_t
-      character*1024      :: file_data = "none"
-      character*1024      :: label
-      character*1024      :: input = "default"
+                                                      !! End of Descriptor types
+   !****************************************************************************
 
-      integer             :: n_data
-      integer             :: n_samples = 200
-      logical             :: compute_similarity = .false.
-      logical             :: compute_exp = .false.
-      logical             :: wrote_exp = .false.
-      logical             :: user_range = .false.
-      logical             :: compute_forces = .false.
+   !****************************************************************************
+                                                           !! Experimental types
+   ! type exp_data_t
+   !    character*1024      :: file_data = "none"
+   !    character*1024      :: weights_file_data = "none"
+   !    character*1024      :: label = "none"
+   !    character*1024      :: input = "default"
 
-      real(dp), allocatable :: data(:, :)
-      real(dp), allocatable :: x(:)
-      real(dp), allocatable :: y(:)
-      real(dp), allocatable :: y_pred(:)
-      real(dp), allocatable :: y_pred_prev(:)
+   !    integer             :: n_data = -1
+   !    integer             :: n_samples = 200
+   !    logical             :: compute_exp = .false.
 
-      real(dp)              :: similarity
-      real(dp)              :: range_min = 0.d0
-      real(dp)              :: range_max = 1.d0
-      real(dp)              :: mag
-   end type exp_data_t
+   !    real(dp), allocatable :: data(:, :)
+   !    real(dp), allocatable :: x(:)
+   !    real(dp), allocatable :: y(:)
+   !    real(dp), allocatable :: y_pred(:)
+   !    real(dp), allocatable :: y_pred_prev(:)
+   !    real(dp), allocatable :: weights(:)
+   ! end type exp_data_t
 
    type exp_pred_container
       integer             :: n_samples = 200
@@ -266,31 +307,15 @@ module types
       real*8              :: range_max = 1.d0
    end type exp_pred_container
 
-! These is the type for the input parameters
-   type input_parameters
+   !****************************************************************************
+                                                                  !! Image types
+   ! DEPRECATED: These should be subsumed into the state type
 
-                                                          !! Input files to read
-      character*1024           :: atoms_file = 'atoms.xyz'
-      character*1024           :: pot_file = "none"
-                                                                  !! Random Seed
-      integer                  :: seed = -1
-
-                               !! Maximum Gb/core for batching soap calculations
-      real(dp)                 :: max_GBytes_per_process = 1.0_dp
-
-                                                            !! Neighbors buffers
-      real(dp)                 :: core_pot_cutoff = 1.0_dp
-      real(dp)                 :: core_pot_buffer = 0.0_dp
-
-                                   !! Number of local properties for convenience
-
-      logical                  :: all_atoms = .true.
-
-   end type input_parameters
-
-! This is a container for atomic images
+   ! This is a container for atomic images
    type image
-      real*8, allocatable :: positions(:, :), positions_prev(:, :), velocities(:, :) , masses(:), forces(:, :), forces_prev(:, :), energies(:), local_properties(:, :)
+      real*8, allocatable :: positions(:, :), positions_prev(:, :),&
+           & velocities(:, :), masses(:), forces(:, :), forces_prev(:, :),&
+           & energies(:), local_properties(:, :)
       real*8 :: a_box(1:3), b_box(1:3), c_box(1:3), energy, e_kin, energy_exp
       integer, allocatable :: species(:), species_supercell(:)
       integer :: n_sites, indices(1:3)

@@ -173,6 +173,7 @@ contains
          if (rank == 0) &
             call print_parameter("do_exp_energies", do_%exp_energies)
          call check_iostatus(iostatus, keyword)
+         do_%exp = .true.
          keyword_found = .true.
       else if (trim(keyword) == "do_exp_forces") then
          backspace (unit)
@@ -181,6 +182,7 @@ contains
             call print_parameter("do_exp_forces", do_%exp_forces)
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
+         do_%exp = .true.
        !! MD options
       else if (trim(keyword) == "scale_box") then
          backspace (unit)

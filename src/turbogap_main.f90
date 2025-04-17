@@ -28,14 +28,15 @@
 
 module turbogap_main
    use kinds, only: dp
-   use read_files, only: read_input_file
    use control, only: control_t, perform_t
-   use control_interface, only: decide_read_xyz, decide_randomize_velocities
+   use control_interface, only: decide_read_xyz, decide_randomize_velocities, &
+                                decide_write_xyz, decide_write_thermo
                                                          !! Importing main types
    use types, only: &
       species_info_t, &
       state_t, &
       thermo_t, &
+      split_t, &
       memory_t, &
       calculation_t, &
       neighbors_t, &
@@ -43,14 +44,15 @@ module turbogap_main
       soap_turbo, &
       gap_2b_t, &
       gap_3b_t, &
-      gap_core_pot_t, &
-      exp_data_t
+      gap_core_pot_t !, &
+   !exp_data_t
 
-   use calculation, only: allocate_calculation, allocate_calculations
+   use calculation, only: allocate_calculations, reset_calculations
 
                                        !! TODO: Add the routines for mc / md and
                                               !! have them be like the way above
 
+                                                        !! Main simulation types
    use md_types, only: md_t
    use md_interface, only: reset_velocities
 
@@ -59,8 +61,9 @@ module turbogap_main
 
    use vdw_types, only: options_vdw_t
 
+                                                                      !! Reading
+   use read_files, only: read_input_file
    use read_xyz, only: read_xyz_file
-
    use read_gap, only: read_gap_hypers
    !
    !, &
@@ -68,6 +71,8 @@ module turbogap_main
    !   Params_XPS, Params_XRD, Params_PDF, Params_EXP
 
    use neighbors_interface, only: build_neighbors_list, collect_neighbors
+
+   use calculate_gap_soap_mod, only: calculate_gap_soap
 
 #ifdef _MPIF90
    use mpi
@@ -112,18 +117,25 @@ contains
 
    subroutine turbogap_run()
                                                    !! Controls for the main loop
+                               !! do_ is what is read in with some dynamic state
       type(control_t)     ::  do_
+                               !! perform logicals ultimately control everything
       type(perform_t)     ::  perform
-                                              !! Input parameters read from file
+
+                                              !! params contains main file names
+                                              !! and misc things that haven't
+                                              !! been refactored out
       type(input_parameters) :: params
                                         !! Options for various calculation types
       type(md_t)     :: md
       type(mc_t)     :: mc
       type(options_vdw_t)     :: options_vdw
-      !type(Params_XPS)         :: options_xps
-      !type(Params_XRD)         :: options_xrd
-      !type(Params_PDF)         :: options_pdf
-      !type(Params_EXP)         :: options_exp
+      !type(options_xps_t)         :: options_xps
+      !type(options_xrd_t)         :: options_xrd
+      !type(options_pdf_t)         :: options_pdf
+      !type(options_sf_t)          :: options_sf
+      !type(options_nd_t)          :: options_nd
+      !type(options_exp_t)         :: options_exp
 
                                                 !! Dynamical state of the system
       type(state_t)              :: state
@@ -176,19 +188,21 @@ contains
       type(calculation_t) :: this_vdw
 
                                                              !! Local properties
+      ! REVIEW: Make local properties into another type?
+      integer :: n_local_properties = 0
       real(dp), allocatable, target :: local_properties(:, :)
+      real(dp), allocatable, target :: local_properties_cart_der(:, :, :)
       real(dp), allocatable, target :: this_local_properties(:, :)
-      real(dp), pointer             :: local_properties_pt(:)
-      real(dp), pointer             :: this_local_properties_pt(:)
-      real(dp), pointer             :: this_hirshfeld_v_pt(:)
+      real(dp), allocatable, target :: this_local_properties_cart_der(:, :, :)
 
-                                                    !! Neighbors needed for soap
-      integer, allocatable :: der_neighbors(:)
-      integer, allocatable :: der_neighbors_list(:)
+      real(dp), pointer :: local_properties_pt(:)
+      real(dp), pointer :: local_properties_cart_der_pt(:, :)
+
+      real(dp), pointer :: this_local_properties_pt(:, :)
+      real(dp), pointer :: this_local_properties_cart_der_pt(:, :, :)
 
                                                  !! Experimental data containers
-      integer :: n_local_properties = 0
-      type(exp_data_t), allocatable :: exp_data(:)
+      !type(exp_data_t), allocatable :: exp_data(:)
 
                                             !! Turbogap mode (md, mc or predict)
       character*16 :: mode = "none"
@@ -202,6 +216,7 @@ contains
       integer :: ierr = 0
 
                                  !! Variables which allow splitting of mpi tasks
+      type(split_t) :: split
       integer :: i_beg = -1 ! Atoms
       integer :: i_end = -1 ! Atoms
       integer :: j_beg = -1 ! Neighbors
@@ -211,16 +226,11 @@ contains
 
                                                           !! Neighbors variables
       type(neighbors_t)    :: neighbors
-      integer, allocatable :: n_atom_pairs_by_rank_prev(:)
 
                                                                        !! Timing
       type(times_t) :: time
 
       real(dp) :: seed
-
-                                                           !! Main loop counters
-      integer :: i_step = -1
-      integer :: n_steps = 0
 
       !*************************************************************************
                                                                      !! MPI Init
@@ -259,9 +269,9 @@ contains
       call get_turbogap_mode(rank, mode)
 
       !*************************************************************************
-      !- Reading input file
+                                                           !! Reading input file
 
-      ! Reading input file parameters
+      ! TODO: Make this a single process function and broadcast
 
       call time_start(time%io)
 
@@ -298,7 +308,7 @@ contains
 
       ! Reading .gap file parameters
       !
-      ! TODO: Input the read files
+      ! TODO: Make this a single process function and broadcast
       !
       call time_start(time%io)
 
@@ -308,6 +318,10 @@ contains
                            n_gap_3b, gap_3b_hypers, &
                            n_gap_core_pot, gap_core_pot_hypers, &
                            neighbors%rcut_max, do_%prediction, params, rank)
+
+      call get_irreducible_local_properties(params, n_local_properties_tot, n_soap_turbo, soap_turbo_hypers, &
+                           local_property_labels, local_property_labels_temp, local_property_labels_temp2, local_property_indexes, &
+                                            valid_vdw, vdw_lp_index, core_be_lp_index, valid_xps, xps_idx)
 
       call time_end(time%io)
 
@@ -343,6 +357,10 @@ contains
       perform%gap_2b = (n_gap_2b > 0)
       perform%gap_3b = (n_gap_3b > 0)
       perform%gap_core_pot = (n_gap_core_pot > 0)
+
+      if (perform%gap_soap) then
+         perform%local_properties = any(soap_turbo_hypers(:)%has_local_properties)
+      end if
 
       !! Decide whether to do experimental options
       perform%pdf = do_%pdf
@@ -395,15 +413,8 @@ contains
 
       perform%read_xyz = decide_read_xyz(do_, md%i_step, mc%i_step)
 
-      perform%write_xyz = ( &
-                          (do_%md .and. (.not. do_%mc) .and. &
-                           (modulo(md%i_step, do_%write_xyz) == 0)) .or. &
-                          (do_%mc .and. (.not. do_%md) .and. &
-                           (modulo(mc%i_step, do_%write_xyz) == 0)) &
-                          )
-
-      perform%write_thermo = (do_%md .and. &
-                              (modulo(md%i_step, do_%write_thermo) == 0))
+      perform%write_xyz = decide_write_xyz(do_, md, mc)
+      perform%write_thermo = decide_write_thermo(do_, md)
 
       perform%randomize_velocities = decide_randomize_velocities( &
                                      md%randomize_velocities, &
@@ -441,35 +452,20 @@ contains
          call print_parameter(" perform broadcast ", perform%broadcast)
       end if
 
-      !
-      ! do_%
-
-      ! ! Decide if we need to read the xyz
-
-      ! if (do_%hybrid_mc) then
-      !    if (.not. do_%md) then
-      !       do_%forces = .false.
-      !    else
-      !       do_%forces = .true.
-      !    end if
-      ! end if
-
       ! call decide_what_to_do(  )
 
       !*************************************************************************
                                                              !! Reading xyz file
 
-      ! Reading the xyz file
-
-      ! FIXME: Insert conditional reading here for the loops
-
       if (perform%read_xyz) then
+
          call time_start(time%xyz)
 
          call read_xyz_file(rank, params%atoms_file, thermo, species_info, &
                             neighbors%rcut_max, state, do_)
 
          call time_end(time%xyz)
+
       end if
 
                                                   !! Randomize velocities if set
@@ -507,7 +503,7 @@ contains
 
                         !! Set i_beg and i_end which split atoms among MPI tasks
       if (perform%reallocate) &
-         call split_tasks(state%n_sites, n_tasks, rank, i_beg, i_end)
+         call split_tasks(state%n_sites, n_tasks, rank, split)
 
 #ifdef _DEBUG
       if (rank == 0) then
@@ -561,11 +557,11 @@ contains
 
                                                       !! Build the neighbor list
          call build_neighbors_list(state, neighbors, do_%rebuild_neighbors_list, &
-                                   i_beg, i_end, do_%timing, rank)
+                                   split, do_%timing, rank)
 
                                       !! Broadcast neighbors and set j_beg j_end
          call collect_neighbors(neighbors, do_%rebuild_neighbors_list, &
-                                state%n_sites, rank, n_tasks, j_beg, j_end, &
+                                state%n_sites, rank, n_tasks, split, &
                                 time%mpi)
 
          call time_end(time%neighbors)
@@ -605,6 +601,28 @@ contains
                                     this_xrd, &
                                     this_xps, &
                                     this_vdw)
+      else
+
+         call reset_calculations(perform, do_%forces, &
+                                 total, &
+                                 gap_soap, &
+                                 gap_2b, &
+                                 gap_3b, &
+                                 gap_core_pot, &
+                                 pdf, &
+                                 sf, &
+                                 xrd, &
+                                 nd, &
+                                 xps, &
+                                 vdw, &
+                                 this_total, &
+                                 this_gap_soap, &
+                                 this_gap_2b, &
+                                 this_gap_3b, &
+                                 this_gap_core_pot, &
+                                 this_xrd, &
+                                 this_xps, &
+                                 this_vdw)
 
       end if
 
@@ -614,7 +632,9 @@ contains
       !*************************************************************************
                                                                  !! get_gap_soap
 
-      ! call time_start( time % soap )
+      call time_start(time%soap)
+
+      call time_end(time%soap)
       !
       ! call calculate_soap( do_, state, neighbors, gap_soap_hypers, gap_soap)
       !
@@ -651,8 +671,7 @@ contains
       !         end do
       ! end do
       !
-      ! call time_end( time % soap )
-      !
+
 #ifdef _DEBUG
       if (rank == 0) then
          call print_debug("Finished get_gap_soap ", "turbogap_main.f90")

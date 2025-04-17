@@ -28,7 +28,7 @@
 
 module misc
    use kinds, only: dp
-   use types, only: input_parameters, neighbors_t
+   use types, only: input_parameters, neighbors_t, split_t
    use timer, only: times_t
    use printing, only: print_error, print_parameter, print_separator, print_line
    implicit none
@@ -60,28 +60,27 @@ contains
    !*************************************************************************
                                                                 !! MPI splitting
 
-   subroutine split_tasks(n_sites, n_tasks, rank, i_beg, i_end)
+   subroutine split_tasks(n_sites, n_tasks, rank, split)
       integer, intent(in) :: n_sites
       integer, intent(in) :: n_tasks
       integer, intent(in) :: rank
-      integer, intent(out) :: i_beg
-      integer, intent(out) :: i_end
+      type(split_t), intent(out) :: split
 
 #ifdef _MPIF90
       if (rank < mod(n_sites, n_tasks)) then
-         i_beg = 1 + rank*(n_sites/n_tasks + 1)
+         split%i_beg = 1 + rank*(n_sites/n_tasks + 1)
       else
-         i_beg = 1 + mod(n_sites, n_tasks)*(n_sites/n_tasks + 1) + (rank - mod(n_sites, n_tasks))*(n_sites/n_tasks)
+         split%i_beg = 1 + mod(n_sites, n_tasks)*(n_sites/n_tasks + 1) + (rank - mod(n_sites, n_tasks))*(n_sites/n_tasks)
       end if
       if (rank < mod(n_sites, n_tasks)) then
-         i_end = (rank + 1)*(n_sites/n_tasks + 1)
+         split%i_end = (rank + 1)*(n_sites/n_tasks + 1)
       else
-         i_end = i_beg + n_sites/n_tasks - 1
+         split%i_end = split%i_beg + n_sites/n_tasks - 1
       end if
 
 #else
-      i_beg = 1
-      i_end = n_sites
+      split%i_beg = 1
+      split%i_end = n_sites
 #endif
    end subroutine split_tasks
 

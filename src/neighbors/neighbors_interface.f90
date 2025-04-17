@@ -28,7 +28,7 @@
 
 module neighbors_interface
    use kinds, only: dp
-   use types, only: state_t, neighbors_t
+   use types, only: state_t, neighbors_t, split_t
    use functions, only: cross_product
    use timing, only: time_start, time_end
    use mpi
@@ -42,15 +42,14 @@ contains
 !
 
    subroutine collect_neighbors(neighbors, rebuild_neighbors_list, &
-                                n_sites, rank, n_tasks, j_beg, j_end, &
+                                n_sites, rank, n_tasks, split, &
                                 time_mpi)
       type(neighbors_t), intent(inout) :: neighbors
       logical, intent(in) :: rebuild_neighbors_list
       integer, intent(in) :: n_sites
       integer, intent(in) :: n_tasks
       integer, intent(in) :: rank
-      integer, intent(out) :: j_beg
-      integer, intent(out) :: j_end
+      type(split_t), intent(inout) :: split
       real(dp), intent(inout) :: time_mpi(3)
       integer :: ierr
 
@@ -58,6 +57,9 @@ contains
       if (rebuild_neighbors_list) then
          if (.not. allocated(neighbors%n_atom_pairs_by_rank)) then
             allocate (neighbors%n_atom_pairs_by_rank(n_tasks))
+            allocate (neighbors%n_atom_pairs_by_rank_prev(n_tasks))
+         else
+            neighbors%n_atom_pairs_by_rank_prev = neighbors%n_atom_pairs_by_rank
          end if
 
          call time_start(time_mpi)
@@ -68,37 +70,39 @@ contains
                             MPI_INTEGER, MPI_COMM_WORLD, ierr)
 
          neighbors%n_atom_pairs_total = sum(neighbors%n_atom_pairs_by_rank)
-         neighbors%n_atom_pairs = neighbors%n_atom_pairs_total
+         ! neighbors%n_atom_pairs = neighbors%n_atom_pairs_total
 
          !     Get number of neighbors
          if (.not. allocated(neighbors%n_neigh_global)) &
             allocate (neighbors%n_neigh_global(1:n_sites))
-         call mpi_reduce(neighbors%n_neigh, neighbors%n_neigh_global,&
-              & n_sites, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+         call mpi_reduce(neighbors%n_neigh, neighbors%n_neigh_global, &
+                         n_sites, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
          call move_alloc(neighbors%n_neigh_global, neighbors%n_neigh)
+
          call mpi_bcast(neighbors%n_neigh, n_sites, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
          call time_end(time_mpi)
 
-         j_beg = 1
-         j_end = neighbors%n_atom_pairs_by_rank(rank + 1)
+         split%j_beg = 1
+         split%j_end = neighbors%n_atom_pairs_by_rank(rank + 1)
       end if
 #else
-      j_beg = 1
-      j_end = neighbors%n_atom_pairs
+      split%j_beg = 1
+      split%j_end = neighbors%n_atom_pairs
       neighbors%n_atom_pairs_by_rank(rank + 1) = neighbors%n_atom_pairs
 #endif
    end subroutine collect_neighbors
 
-   subroutine build_neighbors_list(state, neighbors, rebuild_neighbors, i_beg, i_end, do_timing, rank)
+   subroutine build_neighbors_list(state, neighbors, rebuild_neighbors, split, do_timing, rank)
 
       implicit none
       ! Input variables
       integer, intent(in) :: rank
       logical, intent(in) :: do_timing
       logical, intent(in) :: rebuild_neighbors
-      integer, intent(in) :: i_beg
-      integer, intent(in) :: i_end
+      type(split_t), intent(in) :: split
       ! In out variables
     !! Contains state % positions, velocities and lattice vectors
       type(state_t), intent(inout) :: state
@@ -125,7 +129,7 @@ contains
          neighbors%do_list = .false.
       end if
 #ifdef _MPIF90
-      neighbors%do_list(i_beg:i_end) = .true.
+      neighbors%do_list(split%i_beg:split%i_end) = .true.
 #else
       neighbors%do_list = .true.
 #endif

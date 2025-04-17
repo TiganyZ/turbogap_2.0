@@ -51,6 +51,8 @@ module control
       logical :: gap_3b = .false.
       logical :: gap_core_pot = .false.
 
+      logical :: local_properties = .false.
+
       logical :: exp = .false.
 
       logical :: pdf = .false.
@@ -81,12 +83,11 @@ module control
       logical :: estat = .false.
 
                                                       !! Experimental procedures
-
-      logical :: xps = .false.
-      logical :: nd = .false.
-      logical :: xrd = .false.
       logical :: pdf = .false.
+      logical :: xrd = .false.
       logical :: sf = .false.
+      logical :: nd = .false.
+      logical :: xps = .false.
 
       logical :: timing = .false.
 
@@ -141,6 +142,7 @@ module control
       logical :: write_soap = .false.
       logical :: write_stress = .true.
       logical :: write_velocities = .true.
+      logical, allocatable :: write_local_properties(:)
 
                                                             !! IO - Experimental
       logical :: write_exp = .true.
