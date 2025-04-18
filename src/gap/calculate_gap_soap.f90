@@ -91,7 +91,6 @@ contains
                                  params, &
                                  gap_soap, &
                                  this_gap_soap, &
-                                 soap_cart_der, &
                                  n_local_properties, &
                                  local_properties_indexes, &
                                  local_properties, &
@@ -161,7 +160,6 @@ contains
 
       logical :: hyper_has_local_properties
 
-      call time_start(time_soap)
       call time_start(time_gap)
 
       if (perform%local_properties) then
@@ -275,7 +273,9 @@ contains
                               this_j_beg, &
                               this_j_end, &
                               this_gap_soap%virial, &
-                              n_lp_count)
+                              n_lp_count, &
+                              time_soap, &
+                              time_local_properties)
 
             gap_soap%energies = gap_soap%energies + this_gap_soap%energies
 
@@ -313,9 +313,6 @@ contains
          ! AT THE MOMENT I'M MAKING THE CODE PRINT AN ERROR MESSAGE AND STOP EXECUTION IF THE USER TRIES TO WRITE OUT THESE
          ! FILES WITH MORE THAN ONE MPI TASK
 
-         call time_end(time_soap)
-         call time_end(time_gap)
-
       end do
 
 #ifdef _MPIF90
@@ -332,6 +329,7 @@ contains
       end if
 #endif
 
+      call time_end(time_gap)
    end subroutine calculate_gap_soap
 
    subroutine write_soap(rank, overwrite, n_sites, i_n_soap_turbo, n_soap_turbo, soap, &

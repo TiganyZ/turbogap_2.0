@@ -340,78 +340,91 @@ contains
          if (rank == 0) &
             call print_parameter("do_write_velocities", do_%write_velocities)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_forces') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_forces
          if (rank == 0) &
             call print_parameter("do_write_forces", do_%write_forces)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_fixes') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_fixes
          if (rank == 0) &
             call print_parameter("do_write_fixes", do_%write_fixes)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_stress') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_stress
          if (rank == 0) &
             call print_parameter("do_write_stress", do_%write_stress)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_virial') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_virial
          if (rank == 0) &
             call print_parameter("do_write_virial", do_%write_virial)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_pressure') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_pressure
          if (rank == 0) &
             call print_parameter("do_write_pressure", do_%write_pressure)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_hirshfeld_v') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_hirshfeld_v
          if (rank == 0) &
             call print_parameter("do_write_hirshfeld_v", do_%write_hirshfeld_v)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_local_energies') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_local_energies
          if (rank == 0) &
             call print_parameter("do_write_local_energies", do_%write_local_energies)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_masses') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_masses
          if (rank == 0) &
             call print_parameter("do_write_masses", do_%write_masses)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'verbosity' .or. keyword == 'verb') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%verb
          if (rank == 0) &
             call print_parameter("do_verb", do_%verb)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'write_xyz') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_xyz
          if (rank == 0) &
             call print_parameter("do_write_xyz", do_%write_xyz)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'print_progress') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%print_progress
          if (rank == 0) &
             call print_parameter("do_print_progress", do_%print_progress)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'which_atom') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%which_atom
          if (rank == 0) &
             call print_parameter("do_which_atom", do_%which_atom)
          call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       end if
 
    end subroutine read_options_control

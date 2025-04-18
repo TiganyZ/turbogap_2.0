@@ -506,7 +506,7 @@ contains
 
    subroutine read_general_exp_option(input, iostatus, rank, keyword, &
                                       keyword_found, prefix, exp_options)
-      character*1024, intent(in) :: keyword
+      character(len=*), intent(in) :: keyword
       integer, intent(in) :: rank
       ! prefix is appended to the keywords to find
       character(len=*), intent(in) :: prefix

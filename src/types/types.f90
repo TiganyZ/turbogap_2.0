@@ -139,6 +139,7 @@ module types
 
       ! Instant temperature
       real(dp)    :: instant_temp = 0.0_dp
+      real(dp)    :: instant_pressure = 0.0_dp
    end type state_t
 
                           !! Type for splitting atoms/neighbors to mpi processes

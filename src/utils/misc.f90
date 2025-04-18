@@ -28,9 +28,11 @@
 
 module misc
    use kinds, only: dp
+   use control, only: control_t
    use types, only: input_parameters, neighbors_t, split_t
    use timer, only: times_t
    use printing, only: print_error, print_parameter, print_separator, print_line
+   use error, only: turbogap_abort
    implicit none
 
 contains
@@ -196,14 +198,69 @@ contains
       character*16, intent(inout) :: mode
       integer, intent(in) :: rank
       call get_command_argument(1, mode)
-      if (rank == 0) then
-         if (mode == "" .or. mode == "none") then
+      if (.not. &
+          ( &
+          (trim(mode) == "predict") .or. &
+          (trim(mode) == "md") .or. &
+          (trim(mode) == "mc") .or. &
+          (trim(mode) == "soap") &
+          ) &
+          ) then
+         if (rank == 0) then
             call print_error("TurboGAP was run with an invalid mode! ")
             call print_error("You need to run 'turbogap md' or 'turbogap predict'&
                  & or `turbogap mc`")
-            stop
          end if
+
+         call turbogap_abort()
       end if
    end subroutine get_turbogap_mode
+
+   function file_open(unit)
+      integer, intent(in) :: unit
+      logical :: file_open
+      inquire (unit=unit, opened=file_open)
+   end function file_open
+
+   subroutine file_close(unit, opened)
+      integer, intent(in) :: unit
+      logical, intent(in) :: opened
+      if (opened) then
+         call flush (unit)
+         close (unit)
+      end if
+   end subroutine file_close
+
+   subroutine open_files(rank, do_, file_trajectory, opened_file_trajectory, &
+                         file_thermo, opened_file_thermo, file_mc, opened_file_mc, &
+                         file_mc_log, opened_file_mc_log)
+      type(control_t), intent(in) :: do_
+      integer, intent(in) :: rank
+
+      logical, intent(inout) :: opened_file_trajectory, opened_file_thermo, opened_file_mc, opened_file_mc_log
+
+      integer, intent(in) :: file_mc
+      integer, intent(in) :: file_mc_log
+      integer, intent(in) :: file_thermo
+      integer, intent(in) :: file_trajectory
+      if (rank == 0) then
+
+         if (do_%md .or. do_%hybrid_mc) then
+            open (unit=file_trajectory, file="trajectory_out.xyz", status="unknown")
+            opened_file_trajectory = .true.
+            open (unit=file_thermo, file="thermo.log", status="unknown")
+            opened_file_thermo = .true.
+         else if (do_%mc) then
+            open (unit=file_mc, file="mc_all.xyz", status="unknown")
+            opened_file_mc = .true.
+            open (unit=file_mc_log, file="mc.log", status="unknown")
+            opened_file_mc_log = .true.
+         else
+            open (unit=file_trajectory, file="trajectory_out.xyz", status="unknown")
+            opened_file_trajectory = .true.
+         end if
+
+      end if
+   end subroutine open_files
 
 end module misc

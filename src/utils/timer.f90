@@ -37,12 +37,17 @@ module timer
    type times_t
       real(dp) :: total(3) = 0.0_dp
 
+      real(dp) :: soap(3) = 0.0_dp
+
       real(dp) :: gap_soap(3) = 0.0_dp
       real(dp) :: gap_2b(3) = 0.0_dp
       real(dp) :: gap_3b(3) = 0.0_dp
       real(dp) :: gap_core_pot(3) = 0.0_dp
 
+      real(dp) :: local_properties(3) = 0.0_dp
+
       real(dp) :: io(3) = 0.0_dp
+      real(dp) :: writing(3) = 0.0_dp
       real(dp) :: checks(3) = 0.0_dp
       real(dp) :: xyz(3) = 0.0_dp
 

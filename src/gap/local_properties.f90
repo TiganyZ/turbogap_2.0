@@ -32,7 +32,7 @@ module local_prop
    use types, only: soap_turbo
    use exp_types, only: exp_data_t, exp_indexes_t, xps_t
    use vdw_types, only: options_vdw_t
-   use printing, only: print_message, print_error
+   use printing, only: print_message, print_error, print_parameter, print_parameters
    implicit none
 
    type lp_indexes_t
@@ -297,6 +297,12 @@ contains
       if (n_local_properties > 0) then
          allocate (do_%write_local_properties(1:n_local_properties))
          do_%write_local_properties = .true.
+
+         if (rank == 0) then
+            call print_parameter("n_local_properties", n_local_properties)
+            call print_parameters("Local prop. labels", local_property_labels)
+         end if
+
       end if
 
    end subroutine get_irreducible_local_properties

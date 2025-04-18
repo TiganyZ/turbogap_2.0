@@ -39,7 +39,8 @@ module md_types
       real(dp) :: step = 1.0_dp
 
                                                            !! MD time step taken
-      real(dp) :: time_step
+      real(dp) :: time = 0.0_dp
+      real(dp) :: time_step = 1.0_dp
       real(dp) :: time_step_prev
 
                                        !! Tolerances for equilibrium convergence

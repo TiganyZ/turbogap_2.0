@@ -58,6 +58,7 @@ module turbogap_main
                                                         !! Main simulation types
    use md_types, only: md_t
    use md_interface, only: reset_velocities
+   use md_utils, only: wrap_pbc
 
    use mc_types, only: mc_t
    use mc_interface ! , only: perform_mc
@@ -68,6 +69,10 @@ module turbogap_main
    use read_files, only: read_input_file
    use read_xyz, only: read_xyz_file
    use read_gap, only: read_gap_hypers
+
+                                                                      !! Writing
+   use write_xyz, only: write_extxyz
+
    !
    !, &
    !   options_md_t, options_mc_t, &
@@ -90,7 +95,7 @@ module turbogap_main
                        print_parameters, printf_message, printf_small_message
 
    use misc, only: print_splash_screen, set_random_seed, get_turbogap_mode, &
-                   split_tasks, get_rcut_max
+                   split_tasks, get_rcut_max, file_open, file_close, open_files
 
    ! use soap_turbo_desc
    ! use gap
@@ -241,6 +246,19 @@ contains
                                                                        !! Timing
       type(times_t) :: time
 
+                                                                   !! File Units
+      integer, parameter :: file_mc = 120
+      integer, parameter :: file_mc_log = 121
+      integer, parameter :: file_thermo = 122
+      integer, parameter :: file_trajectory = 123
+
+      logical :: opened_file_mc = .false.
+      logical :: opened_file_mc_log = .false.
+      logical :: opened_file_thermo = .false.
+      logical :: opened_file_trajectory = .false.
+
+      character*1024 :: energies_string = ""
+
       real(dp) :: seed
 
       !*************************************************************************
@@ -336,10 +354,17 @@ contains
                            n_gap_core_pot, gap_core_pot_hypers, &
                            neighbors%rcut_max, do_%prediction, params, rank)
 
-      call get_irreducible_local_properties(rank, do_, n_local_properties, &
-                                            n_local_properties_tot, n_gap_soap, gap_soap_hypers, &
-                                            local_property_labels, local_property_indexes, options_exp%n_exp, exp_data, &
-                                            exp_indexes, lp_indexes, options_vdw, options_xps)
+               !! Count and connect local properties to experimental/vdw options
+      call get_irreducible_local_properties(rank, do_, &
+                                            n_local_properties, &
+                                            n_local_properties_tot, &
+                                            n_gap_soap, gap_soap_hypers, &
+                                            local_property_labels, &
+                                            local_property_indexes, &
+                                            options_exp%n_exp, exp_data, &
+                                            exp_indexes, &
+                                            lp_indexes, &
+                                            options_vdw, options_xps)
 
       call time_end(time%io)
 
@@ -368,6 +393,12 @@ contains
       ! call broadcast_gap_3b( n_gap_3b, gap_3b_hypers )
       !
       ! call time_end( time % mpi )
+
+      !! Open all files necessary to write to ( trajectory_out.xyz, thermo.log,
+      !! mc.log, mc_all.xyz )
+      call open_files(rank, do_, file_trajectory, opened_file_trajectory, &
+                      file_thermo, opened_file_thermo, file_mc, opened_file_mc, &
+                      file_mc_log, opened_file_mc_log)
 
                             !! Setting that we will always do these calculations
 
@@ -430,8 +461,8 @@ contains
 
       perform%read_xyz = decide_read_xyz(do_, md%i_step, mc%i_step)
 
-      perform%write_xyz = decide_write_xyz(do_, md, mc)
-      perform%write_thermo = decide_write_thermo(do_, md)
+      perform%write_xyz = decide_write_xyz(do_, md, mc, rank)
+      perform%write_thermo = decide_write_thermo(do_, md, rank)
 
       perform%randomize_velocities = decide_randomize_velocities( &
                                      md%randomize_velocities, &
@@ -439,11 +470,13 @@ contains
                                      md%i_step, &
                                      allocated(state%velocities))
 
-      if (rank == 1) then
+      if (rank == 0) then
          call print_parameter(" perform md_step ", perform%md_step)
          call print_parameter(" perform mc_step ", perform%mc_step)
          call print_parameter(" perform nested_step ", perform%nested_step)
          call print_parameter(" perform randomize_velocities ", perform%randomize_velocities)
+
+         call print_parameter(" perform local properties ", perform%local_properties)
 
          call print_parameter(" perform neighbors ", perform%neighbors)
 
@@ -597,49 +630,25 @@ contains
                                                   !! Allocate calculation arrays
 
       if (perform%reallocate) then
-                                                    !! Allocate gap Calculations
+                                                  !! Allocate calculation arrays
          call allocate_calculations(perform, state%n_sites, do_%forces, &
                                     total, &
-                                    gap_soap, &
-                                    gap_2b, &
-                                    gap_3b, &
-                                    gap_core_pot, &
-                                    pdf, &
-                                    sf, &
-                                    xrd, &
-                                    nd, &
-                                    xps, &
-                                    vdw, &
+                                    gap_soap, gap_2b, gap_3b, gap_core_pot, &
+                                    pdf, sf, xrd, nd, xps, vdw, &
                                     this_total, &
-                                    this_gap_soap, &
-                                    this_gap_2b, &
-                                    this_gap_3b, &
+                                    this_gap_soap, this_gap_2b, this_gap_3b, &
                                     this_gap_core_pot, &
-                                    this_xrd, &
-                                    this_xps, &
-                                    this_vdw)
+                                    this_xrd, this_xps, this_vdw)
       else
-
+                                              !! Reinitialize calculation arrays
          call reset_calculations(perform, do_%forces, &
                                  total, &
-                                 gap_soap, &
-                                 gap_2b, &
-                                 gap_3b, &
-                                 gap_core_pot, &
-                                 pdf, &
-                                 sf, &
-                                 xrd, &
-                                 nd, &
-                                 xps, &
-                                 vdw, &
+                                 gap_soap, gap_2b, gap_3b, gap_core_pot, &
+                                 pdf, sf, xrd, nd, xps, vdw, &
                                  this_total, &
-                                 this_gap_soap, &
-                                 this_gap_2b, &
-                                 this_gap_3b, &
+                                 this_gap_soap, this_gap_2b, this_gap_3b, &
                                  this_gap_core_pot, &
-                                 this_xrd, &
-                                 this_xps, &
-                                 this_vdw)
+                                 this_xrd, this_xps, this_vdw)
 
       end if
 
@@ -649,45 +658,25 @@ contains
       !*************************************************************************
                                                                  !! get_gap_soap
 
-      call time_start(time%gap_soap)
+      if (perform%gap_soap) then
 
-      call time_end(time%gap_soap)
-      !
-      ! call calculate_soap( do_, state, neighbors, gap_soap_hypers, gap_soap)
-      !
-      ! do i = 1, n_soap
-      !
-      !     call divide_into_processes( state % positions( :, i_beg : i_end ),     &
-      !         neighbors, this_i_beg, this_i_end, this_j_beg, this_j_end )
-      !
-      !         do j = 1, n_divisions
-      !
-      !            call get_gap_soap(                                              &
-      !               n_sites,                                                     &
-      !               this_n_sites_mpi,                                            &
-      !               state % positions( :, this_i_beg(j) : this_i_end ),          &
-      !               state % indices,                                             &
-      !               state % species( this_i_beg(j) : this_i_end ),               &
-      !               state % xyz_species_supercell( this_i_beg(j) : this_i_end ), &
-      !               neighbors % n_neigh( this_i_beg(j) : this_i_end ),           &
-      !               neighbors % neighbors_list( this_j_beg(j) : this_j_end ),    &
-      !               neighbors % neighbors_species( this_j_beg(j) : this_j_end ), &
-      !               neighbors % rjs( this_j_beg(j) : this_j_end ),               &
-      !               neighbors % thetas( this_j_beg(j) : this_j_end ),            &
-      !               neighbors % phis( this_j_beg(j) : this_j_end ),              &
-      !               neighbors % xyz( this_j_beg(j) : this_j_end ),               &
-      !               do % write_soap,                                             &
-      !               do % forces,                                                 &
-      !               do % derivatives,                                            &
-      !               do % timing,                                                 &
-      !               this_gap_soap,                                               &
-      !               gap_soap_hypers(i),                                          &
-      !               soap,                                                        &
-      !               soap_cart_der)
-      !
-      !         end do
-      ! end do
-      !
+         call calculate_gap_soap(rank, do_, perform, &
+                                 state, &
+                                 neighbors, &
+                                 n_gap_soap, gap_soap_hypers, &
+                                 split, &
+                                 params, &
+                                 gap_soap, this_gap_soap, &
+                                 n_local_properties, &
+                                 local_property_indexes, &
+                                 local_properties, this_local_properties, &
+                                 local_properties_cart_der, &
+                                 this_local_properties_cart_der, &
+                                 time%soap, &
+                                 time%gap_soap, &
+                                 time%mpi, &
+                                 time%local_properties)
+      end if
 
 #ifdef _DEBUG
       if (rank == 0) then
@@ -797,6 +786,8 @@ contains
       !*************************************************************************
                                                             !! Collecting forces
 
+      ! FIXME: Do the broadcasting of forces and energies
+      !
 #ifdef _DEBUG
       if (rank == 0) then
          call print_debug("Finished collecting forces", "turbogap_main.f90")
@@ -808,6 +799,21 @@ contains
 
       !*************************************************************************
                                                                 !! Doing md step
+
+      if (perform%write_xyz .or. .true.) then
+         call time_start(time%writing)
+
+         call wrap_pbc(state%positions(1:3, 1:state%n_sites), &
+                       state%a_box/dfloat(state%indices(1)), &
+                       state%b_box/dfloat(state%indices(2)), &
+                       state%c_box/dfloat(state%indices(3)))
+
+         call write_extxyz(file_trajectory, do_, state, md, &
+                           total%energies, total%forces, total%virial, &
+                           local_property_labels, local_properties, energies_string)
+
+         call time_end(time%writing)
+      end if
 
 #ifdef _DEBUG
       if (rank == 0) then
@@ -865,7 +871,14 @@ contains
                                                                    !! Finalizing
 
       if (rank == 0) then
-         call time_end(time%total)
+         call file_close(file_trajectory, opened_file_trajectory)
+         call file_close(file_thermo, opened_file_thermo)
+         call file_close(file_mc, opened_file_mc)
+         call file_close(file_mc_log, opened_file_mc_log)
+      end if
+
+      call time_end(time%total)
+      if (rank == 0) then
          call print_times(time, do_)
          call print_end_of_execution()
       end if

@@ -65,6 +65,8 @@ SRC := kinds.f90 \
        read_exp.f90 \
        read_files.f90 \
        \
+       write_xyz.f90 \
+       \
        local_properties.f90 \
        gap.f90 \
        gap_interface.f90 \

@@ -42,12 +42,16 @@ contains
 
    subroutine print_times(time, do_)
       type(times_t), intent(in) :: time
+      real(dp) :: sum
       type(control_t), intent(in) :: do_
 
+      sum = 0.0_dp
       call print_message("Timing")
 
       call print_small_message("GAP desc/pred:")
       call print_parameter("* gap_soap ", time%gap_soap(3), 's')
+      call print_parameter("** soap ", time%soap(3), 's')
+      call print_parameter("** local_properties ", time%local_properties(3), 's')
       call print_parameter("* gap_2b ", time%gap_2b(3), 's')
       call print_parameter("* gap_3b ", time%gap_3b(3), 's')
       call print_parameter("* gap_core_pot ", time%gap_core_pot(3), 's')
@@ -89,10 +93,14 @@ contains
       call print_parameter("* io ", time%io(3), 's')
       call print_parameter("* checks ", time%checks(3), 's')
       call print_parameter("* xyz ", time%xyz(3), 's')
+      call print_parameter("* writing ", time%writing(3), 's')
       call print_separator(' ')
 
+      sum = sum_times(time)
       call print_small_message("Total:")
-      call print_parameter("* sum ", time%total(3), 's')
+      call print_parameter("* sum ", sum, 's')
+      call print_parameter("* misc ", time%total(3) - sum, 's')
+      call print_parameter("* total_exec ", time%total(3), 's')
 
    end subroutine print_times
 
@@ -133,6 +141,7 @@ contains
 
       total = total + time%io(3)
       total = total + time%xyz(3)
+      total = total + time%writing(3)
 
       total = total + time%neighbors(3)
       total = total + time%md(3)

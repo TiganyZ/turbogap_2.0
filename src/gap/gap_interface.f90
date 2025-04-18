@@ -33,6 +33,7 @@ module gap_interface
    use local_prop
    use control, only: control_t
    use types, only: state_t, neighbors_t, soap_turbo, local_property_soap_turbo
+   use timing, only: time_start, time_end
 contains
 
 !**************************************************************************
@@ -48,10 +49,10 @@ contains
                            xyz_species, xyz_species_supercell, alphas, Qs, all_atoms, &
                            which_atom, indices, soap, soap_cart_der, der_neighbors, der_neighbors_list, &
                            has_local_properties, n_local_properties, local_property_models, &
-                           energies0, forces0, local_properties0,&
-                           & local_properties_cart_der0,&
-                           & local_property_indexes, this_i_beg, this_i_end, this_j_beg,&
-                           & this_j_end, virial, lp_index)
+                           energies0, forces0, local_properties0, &
+                           local_properties_cart_der0, &
+                           local_property_indexes, this_i_beg, this_i_end, this_j_beg, &
+                           this_j_end, virial, lp_index, time_soap, time_local_properties)
 
       implicit none
 
@@ -94,6 +95,10 @@ contains
       integer :: n_sites, i, j, n_atom_pairs, k, k2, i2, j2, n_soap, max_species_multiplicity, i3, n_all_sites, &
                  i4, n_sites_supercell, j3
       logical, allocatable :: mask(:, :), mask0(:, :), is_atom_seen(:)
+
+      real(dp), intent(inout) :: time_soap(3)
+      real(dp), intent(inout) :: time_local_properties(3)
+
 !   CLEAN THIS UP
       real(dp) :: time1, time2
 
@@ -237,12 +242,14 @@ contains
       end if
 
       if (n_sites > 0) then
+         call time_start(time_soap)
          call get_soap(n_sites, n_neigh, n_species, species, species_multiplicity, n_atom_pairs, mask, rjs, &
                        thetas, phis, alpha_max, l_max, rcut_hard, rcut_soft, nf, global_scaling, &
                        atom_sigma_r, atom_sigma_r_scaling, atom_sigma_t, atom_sigma_t_scaling, &
                        amplitude_scaling, radial_enhancement, central_weight, basis, scaling_mode, do_timing, &
                        do_derivatives, compress_soap, compress_P_nonzero, compress_P_i, compress_P_j, &
                        compress_P_el, soap, soap_cart_der)
+         call time_end(time_soap)
       end if
 
       !###########################################!
@@ -250,6 +257,7 @@ contains
       !###########################################!
 
       if (has_local_properties) then
+         call time_start(time_local_properties)
          !call cpu_time(time1)
          ! We need to iterate over the number of local properties
          allocate (local_properties(1:n_sites))
@@ -296,6 +304,8 @@ contains
 
 !call cpu_time(time2)
 !write(*,*) "local_properties time =", time2-time1, "seconds"
+!
+         call time_end(time_local_properties)
       end if
 
       if (do_prediction) then
