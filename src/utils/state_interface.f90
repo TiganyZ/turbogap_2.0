@@ -51,6 +51,7 @@ contains
       allocate (state%species(1:state%n_sites))
       allocate (state%xyz_species(1:state%n_sites))
       allocate (state%fix_atom(1:3, 1:state%n_sites))
+
       if (need_velocities) then
          if (allocated(state%velocities)) deallocate (state%velocities)
          if (allocated(state%masses)) deallocate (state%masses)
@@ -60,14 +61,14 @@ contains
       end if
 
       if (present(n_sites_supercell)) then
-         call reallocate_state_supercell(state, need_velocities, n_sites_supercell)
+         call reallocate_state_supercell(state, n_sites_supercell)
       end if
 
    end subroutine reallocate_state
 
-   subroutine reallocate_state_supercell(state, need_velocities, n_sites_supercell)
+   subroutine reallocate_state_supercell(state, n_sites_supercell)! , need_velocities, n_sites_supercell)
       type(state_t), intent(inout)   :: state
-      logical, intent(in) :: need_velocities
+      !logical, intent(in) :: need_velocities
       integer, intent(in) :: n_sites_supercell
 
       state%n_sites_supercell = n_sites_supercell

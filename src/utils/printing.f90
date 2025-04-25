@@ -71,10 +71,12 @@ contains
             write (string, '(a17,a3,a,a)') adjustl(temp), equals, trim(value), adjustl(unit)
          type is (real(dp))
             if (value < 0.0_dp) then
-               write (temp2, '(g13.6)') value
+               !write (temp2, '(g13.6)') value
+               write (temp2, '(f13.6)') value
                write (string, '(a20,a3,a13,1X,a)') adjustl(temp), equals, adjustl(temp2), adjustl(unit)
             else
-               write (temp2, '(g13.7)') value
+               !write (temp2, '(g13.7)') value
+               write (temp2, '(f13.7)') value
                write (string, '(a20,a3,a13,1X,a)') adjustl(temp), equals, " "//adjustl(temp2), adjustl(unit)
             end if
 
@@ -82,7 +84,7 @@ contains
          type is (integer)
             write (string, '(a17,a3,i8,a)') adjustl(temp), equals, value, adjustl(unit)
          type is (logical)
-            write (string, '(a17,a3,l2,a)') adjustl(temp), equals, value, adjustl(unit)
+            write (string, '(a17,a3,1x,l2,a)') adjustl(temp), equals, value, adjustl(unit)
          end select
 
       else
@@ -92,10 +94,12 @@ contains
             write (string, '(a20,a3,a)') adjustl(temp), equals, " "//trim(value)
          type is (real(dp))
             if (value < 0.0_dp) then
-               write (temp2, '(g18.6)') value
+               !write (temp2, '(g18.6)') value
+               write (temp2, '(f18.6)') value
                write (string, '(a20,a3,a18)') adjustl(temp), equals, adjustl(temp2)
             else
-               write (temp2, '(g19.7)') value
+               !jwrite (temp2, '(g19.7)') value
+               write (temp2, '(f19.7)') value
                write (string, '(a20,a3,a19)') adjustl(temp), equals, " "//adjustl(temp2)
             end if
 
@@ -114,7 +118,7 @@ contains
             else
                write (temp2, '(a7)') '.false.'
             end if
-            write (string, '(a20,a3,a18)') adjustl(temp), equals, adjustl(temp2)
+            write (string, '(a20,a3,1x,a18)') adjustl(temp), equals, adjustl(temp2)
          end select
       end if
 

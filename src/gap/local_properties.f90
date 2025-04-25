@@ -146,10 +146,10 @@ contains
    end subroutine
 !**************************************************************************
 
-   subroutine get_irreducible_local_properties(rank, do_, n_local_properties, &
-                                               n_local_properties_tot, n_soap_turbo, soap_turbo_hypers, &
-                                               local_property_labels, local_property_indexes, n_exp, exp_data, &
-                                               exp_indexes, lp_indexes, options_vdw, options_xps)
+   subroutine check_local_properties(rank, do_, n_local_properties, &
+                                     n_local_properties_tot, n_soap_turbo, soap_turbo_hypers, &
+                                     local_property_labels, local_property_indexes, n_exp, exp_data, &
+                                     exp_indexes, lp_indexes, options_vdw, options_xps)
 
 ! (params, n_local_properties_tot, n_soap_turbo, soap_turbo_hypers,
       ! local_property_labels, local_property_labels_temp,
@@ -305,7 +305,7 @@ contains
 
       end if
 
-   end subroutine get_irreducible_local_properties
+    end subroutine check_local_properties
 
    subroutine check_local_property(property_name, property_index, valid_property, &
                                    i, j, n_soap_turbo, soap_turbo_hypers, do_, local_property_labels)

@@ -30,7 +30,7 @@ module write_xyz
 
    use kinds, only: dp
    use control, only: control_t
-   use types, only: state_t
+   use types, only: state_t, calculation_t
    use md_types, only: md_t
    use functions
 contains
@@ -123,7 +123,7 @@ contains
    end subroutine get_xyz_energy_string
 
    subroutine write_extxyz(trajectory, do_, state, md, &
-                           local_energies, forces, virial, &
+                           calc, &
                            local_property_labels, local_properties, energies_string)
 
                                                          !! Trajectory file unit
@@ -131,9 +131,7 @@ contains
       type(control_t), intent(in)   :: do_
       type(state_t), intent(in)     :: state
       type(md_t), intent(in)        :: md
-      real(dp), intent(in)          :: local_energies(:)
-      real(dp), intent(in)          :: forces(:, :)
-      real(dp), intent(in)          :: virial(3, 3)
+      type(calculation_t), intent(in) :: calc
       character*1024, intent(in)    :: local_property_labels(:)
       real(dp), intent(in)          :: local_properties(:, :)
       character*1024, intent(in) :: energies_string
@@ -288,19 +286,19 @@ contains
 !
 !  Total energy
       if (do_%write_property(7)) then
-         write (temp_string, "(F16.6)") sum(local_energies)
+         write (temp_string, "(F16.6)") sum(calc%energies)
          write (trajectory, "(1X,2A)", advance="no") "energy=", trim(adjustl(temp_string))
 
          write (trajectory, "(1X,A)", advance="no") trim(adjustl(energies_string))
 
       end if
 !
-!   Virial tensor
+!   Calc%Virial tensor
       if (do_%write_property(8)) then
          do i = 1, 3
-            write (lattice_string(i), '(F16.8)') virial(1, i)
-            write (lattice_string(i + 3), '(F16.8)') virial(2, i)
-            write (lattice_string(i + 6), '(F16.8)') virial(3, i)
+            write (lattice_string(i), '(F16.8)') calc%virial(1, i)
+            write (lattice_string(i + 3), '(F16.8)') calc%virial(2, i)
+            write (lattice_string(i + 6), '(F16.8)') calc%virial(3, i)
          end do
          write (trajectory, "(1X,11A)", advance="no") "virial=""", adjustl(lattice_string(1)), lattice_string(2:9), """"
       end if
@@ -309,9 +307,9 @@ contains
       if (do_%write_property(9)) then
          vol = dot_product(cross_product(state%a_box/state%indices(1), state%b_box/state%indices(2)), state%c_box/state%indices(3))
          do i = 1, 3
-            write (lattice_string(i), '(F16.8)') - virial(1, i)/vol
-            write (lattice_string(i + 3), '(F16.8)') - virial(2, i)/vol
-            write (lattice_string(i + 6), '(F16.8)') - virial(3, i)/vol
+            write (lattice_string(i), '(F16.8)') - calc%virial(1, i)/vol
+            write (lattice_string(i + 3), '(F16.8)') - calc%virial(2, i)/vol
+            write (lattice_string(i + 6), '(F16.8)') - calc%virial(3, i)/vol
          end do
          write (trajectory, "(1X,11A)", advance="no") "stress=""", adjustl(lattice_string(1)), lattice_string(2:9), """"
       end if
@@ -346,19 +344,19 @@ contains
          end if
 !     Positions
          if (do_%write_array_property(2)) then
-            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") state%positions(1:3, i)
+            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") state%positions_wrapped(1:3, i)
          end if
 !     State%Velocities
          if (do_%write_array_property(3)) then
             write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") state%velocities(1:3, i)
          end if
-!     Forces
+!     Calc%Forces
          if (do_%write_array_property(4)) then
-            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") forces(1:3, i)
+            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") calc%forces(1:3, i)
          end if
 !     Local energy
          if (do_%write_array_property(5)) then
-            write (trajectory, "(1X,F16.8)", advance="no") local_energies(i)
+            write (trajectory, "(1X,F16.8)", advance="no") calc%energies(i)
          end if
 !     State%Masses
          if (do_%write_array_property(6)) then

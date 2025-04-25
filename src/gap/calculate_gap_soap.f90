@@ -21,6 +21,7 @@ contains
 
    subroutine reset_local_properties(reallocate, &
                                      do_forces, &
+                                     rebuild_neighbors_list, &
                                      n_sites, &
                                      n_atom_pairs, &
                                      n_atom_pairs_prev, &
@@ -34,6 +35,7 @@ contains
 
       logical, intent(in)           :: reallocate
       logical, intent(in)           :: do_forces
+      logical, intent(in)           :: rebuild_neighbors_list
       integer, intent(in)           :: n_sites
       integer, intent(in)           :: n_atom_pairs
       integer, intent(in)           :: n_atom_pairs_prev
@@ -60,23 +62,30 @@ contains
          allocate (this_local_properties(n_sites, n_local_properties), source=0.0_dp)
          this_local_properties_pt => this_local_properties
       else
+         ! if (allocated(this_local_properties)) then
+         !    print *, "renullifying "
+         !    nullify (this_local_properties_pt)
+         !    this_local_properties_pt => this_local_properties
+         ! end if
          local_properties = 0.0_dp
       end if
 
-      if (reallocate .and. do_forces) then
-         if (.not. allocated(local_properties_cart_der)) then
+      if (do_forces) then
+         if (reallocate .or. (n_atom_pairs > n_atom_pairs_prev) &
+             .or. .not. allocated(local_properties_cart_der)) then
+            if (allocated(local_properties_cart_der)) &
+               deallocate (local_properties_cart_der, this_local_properties_cart_der)
+
             allocate (local_properties_cart_der(3, n_atom_pairs, n_local_properties), source=0.0_dp)
             allocate (this_local_properties_cart_der(3, n_atom_pairs, n_local_properties), source=0.0_dp)
-         elseif (n_atom_pairs > n_atom_pairs_prev) then
-            if (allocated(local_properties_cart_der)) deallocate (local_properties_cart_der, this_local_properties_cart_der)
-            allocate (local_properties_cart_der(3, n_atom_pairs, n_local_properties), source=0.0_dp)
-            allocate (this_local_properties_cart_der(3, n_atom_pairs, n_local_properties), source=0.0_dp)
+
          else
             local_properties_cart_der = 0.0_dp
          end if
 
          this_local_properties_cart_der_pt => this_local_properties_cart_der(1:3,&
               & 1:n_atom_pairs, 1:n_local_properties)
+
       end if
    end subroutine reset_local_properties
 
@@ -95,8 +104,10 @@ contains
                                  local_properties_indexes, &
                                  local_properties, &
                                  this_local_properties, &
+                                 this_local_properties_pt, &
                                  local_properties_cart_der, &
                                  this_local_properties_cart_der, &
+                                 this_local_properties_cart_der_pt, &
                                  time_soap, &
                                  time_gap, &
                                  time_mpi, &
@@ -122,8 +133,8 @@ contains
       real(dp), intent(inout), allocatable, target :: this_local_properties_cart_der(:, :, :)
 
                                             !! Pointers for the local properties
-      real(dp), contiguous, pointer :: this_local_properties_pt(:, :)
-      real(dp), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
+      real(dp), intent(inout), contiguous, pointer :: this_local_properties_pt(:, :)
+      real(dp), intent(inout), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
 
       type(split_t), intent(in)          :: split
 
@@ -165,6 +176,7 @@ contains
       if (perform%local_properties) then
          call reset_local_properties(perform%reallocate, &
                                      do_%forces, &
+                                     do_%rebuild_neighbors_list, &
                                      state%n_sites, &
                                      neighbors%n_atom_pairs, &
                                      neighbors%n_atom_pairs_prev, &
@@ -175,7 +187,6 @@ contains
                                      local_properties_cart_der, &
                                      this_local_properties_cart_der, &
                                      this_local_properties_cart_der_pt)
-
       end if
 
       n_lp_count = 0 ! This counts the local properties
@@ -188,6 +199,7 @@ contains
          !       This subroutine splits the load optimally so as to not use more memory per MPI process than available.
          !       TurboGAP does not check how much memory is available, it just relies on heuristics and a user provided
          !       max_Gbytes_per_process (default = 1.d0)
+
          call get_number_of_atom_pairs( &
             neighbors%n_neigh(split%i_beg:split%i_end), &
             neighbors%rjs(split%j_beg:split%j_end), &
@@ -208,6 +220,13 @@ contains
             this_n_sites_mpi = this_i_end - this_i_beg + 1
 
             call reset_calculation(this_gap_soap, do_%forces)
+
+            if (soap_turbo_hypers(i)%has_local_properties) then
+               this_local_properties = 0.0_dp
+               ! if ( do_forces )then
+               !    this_local_properties_cart_der = 0.0_dp
+               ! end if
+            end if
 
             call get_gap_soap(state%n_sites, &
                               this_n_sites_mpi, &
@@ -308,10 +327,6 @@ contains
          n_lp_count = n_lp_count + soap_turbo_hypers(i)%n_local_properties
 
          deallocate (i_beg_list, i_end_list, j_beg_list, j_end_list)
-
-         ! THIS WON'T WORK! THE SOAP AND SOAP DERIVATIVES NEED TO BE COLLECTED FROM ALL RANKS <--------------------- FIX THIS!!!!
-         ! AT THE MOMENT I'M MAKING THE CODE PRINT AN ERROR MESSAGE AND STOP EXECUTION IF THE USER TRIES TO WRITE OUT THESE
-         ! FILES WITH MORE THAN ONE MPI TASK
 
       end do
 

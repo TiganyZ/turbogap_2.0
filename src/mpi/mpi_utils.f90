@@ -26,7 +26,8 @@
 ! HND X
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 module mpi_utils
-   use types, only: state_t, memory_t
+   use kinds, only: dp
+   use types, only: state_t, memory_t, calculation_t
    use control, only: control_t
    use state_interface, only: reallocate_state
 #ifdef _MPIF90
@@ -178,5 +179,32 @@ contains
 
 #endif
    end subroutine broadcast_state
+
+   subroutine collect_calculation(do_forces, n_sites, calc, this_calc, energy)
+      logical, intent(in) :: do_forces
+      integer, intent(in) :: n_sites
+      type(calculation_t), intent(inout) :: calc
+      type(calculation_t), intent(inout) :: this_calc
+      real(dp), intent(out) :: energy
+      integer :: ierr
+
+      call mpi_reduce(calc%energies, this_calc%energies, &
+                      n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      calc%energies = this_calc%energies
+
+      energy = sum(calc%energies)
+
+      if (do_forces) then
+
+         call mpi_reduce(calc%forces, this_calc%forces, &
+                         3*n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         calc%forces = this_calc%forces
+
+         call mpi_reduce(calc%virial, this_calc%virial, &
+                         9, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         calc%virial = this_calc%virial
+      end if
+
+   end subroutine collect_calculation
 
 end module mpi_utils

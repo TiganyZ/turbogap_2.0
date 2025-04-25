@@ -39,7 +39,6 @@ contains
       call MPI_finalize(ierror)
       ! call MPI_abort(ierror, errorcode)
 #endif
-
       stop
    end subroutine turbogap_abort
 

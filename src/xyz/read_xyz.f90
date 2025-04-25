@@ -33,7 +33,7 @@ module read_xyz
    use neighbors_interface, only: number_of_unit_cells_for_given_cutoff
    use md_interface, only: reset_velocities
    use state_interface, only: reallocate_state, reallocate_state_supercell
-   use printing, only: print_message, print_small_message
+   use printing, only: print_message, print_small_message, print_parameter
 
 contains
 
@@ -52,7 +52,8 @@ contains
       species_info, &
       rcut_max, &
       state, &
-      do_)
+      do_, &
+      reallocate)
 
       implicit none
 
@@ -67,6 +68,7 @@ contains
       type(species_info_t), intent(inout) :: species_info
       type(state_t), intent(inout) :: state
       type(control_t), intent(inout) :: do_
+      logical, intent(in) :: reallocate
 
       !   Internal variables
       integer, parameter :: xyz_file = 11
@@ -83,6 +85,7 @@ contains
       state%indices_prev = state%indices
 
       if (.not. do_%supercell_check_only) then
+         print *, "Reading from xyz file!! "
          inquire (file=filename, number=i)
          if (i /= xyz_file) then
             open (unit=xyz_file, file=filename, status="old", action='read')
@@ -90,6 +93,8 @@ contains
 
                                                !! Read n_sites and property line
          call read_n_sites_properties(xyz_file, iostatus, state, properties)
+
+         !call print_parameter("Found n_sites", state%n_sites)
 
          if (.not. do_%recalculate_supercell) then
                                                          !! Reallocate the state
@@ -117,9 +122,16 @@ contains
          end if
       end if
 
+      ! Making the lattice vectors that of the unit cell so we can work out the
+      ! number of unit cells
       state%a_box = state%a_box/dfloat(state%indices_prev(1))
       state%b_box = state%b_box/dfloat(state%indices_prev(2))
       state%c_box = state%c_box/dfloat(state%indices_prev(3))
+
+      print *, "a_box ", state%a_box(1:3)
+      print *, "b_box ", state%b_box(1:3)
+      print *, "c_box ", state%c_box(1:3)
+
       call number_of_unit_cells_for_given_cutoff( &
          state%a_box, &
          state%b_box, &
@@ -136,11 +148,11 @@ contains
                                       *state%indices(2) &
                                       *state%indices(3)
 
-            call reallocate_state_supercell(state, do_%need_velocities, state%n_sites_supercell)
-            call set_supercell(state, do_%need_velocities)
-
+            !call reallocate_state_supercell(state, do_%need_velocities, state%n_sites_supercell)
+            call reallocate_state_supercell(state, state%n_sites_supercell)
+            call set_supercell(state) !, do_%need_velocities)
          else
-            call set_normal_cell(state, do_%need_velocities, do_%supercell_check_only)
+            call set_normal_cell(state) !, do_%need_velocities, do_%supercell_check_only)
          end if
 
          !  FIXME: This is perhaps not the most efficient way to select only one atom, fix in the future
@@ -152,9 +164,16 @@ contains
          end if
 
       else
+         ! Converting the lattice vectors back to the supercell size
+
          state%a_box = state%a_box*dfloat(state%indices_prev(1))
          state%b_box = state%b_box*dfloat(state%indices_prev(2))
          state%c_box = state%c_box*dfloat(state%indices_prev(3))
+      end if
+
+      if (reallocate .or. .not. allocated(state%positions_wrapped)) then
+         if (allocated(state%positions_wrapped)) deallocate (state%positions_wrapped)
+         allocate (state%positions_wrapped(1:3, size(state%positions, 2)), source=0.0_dp)
       end if
 
    end subroutine read_xyz_file
@@ -220,10 +239,10 @@ contains
       end do
    end subroutine read_xyz_lines
 
-   subroutine set_normal_cell(state, need_velocities, supercell_check_only)
+   subroutine set_normal_cell(state) !, need_velocities!, supercell_check_only)
       type(state_t), intent(inout) :: state
-      logical, intent(in) :: need_velocities
-      logical, intent(in) :: supercell_check_only
+      !logical, intent(in) :: need_velocities
+      !logical, intent(in) :: supercell_check_only
 
       state%n_sites_supercell = state%n_sites
       if (allocated(state%xyz_species_supercell)) deallocate (state%xyz_species_supercell)
@@ -234,23 +253,29 @@ contains
       state%species_supercell = state%species
       !      allocate( species_supercell(1:max_species_multiplicity, 1:state % n_sites_supercell) )
       !      species_supercell = species
-      if (supercell_check_only) then
-         allocate (state%positions_supercell(1:3, 1:state%n_sites_supercell))
-         state%positions_supercell = state%positions(1:3, 1:state%n_sites_supercell)
-         call move_alloc(state%positions_supercell, state%positions)
-         !       We need to comment this out here for nested sampling
-         !        if( do_md )then
-         if (allocated(state%velocities)) then
-            allocate (state%velocities_supercell(1:3, 1:state%n_sites_supercell))
-            state%velocities_supercell = state%velocities(1:3, 1:state%n_sites_supercell)
-            call move_alloc(state%velocities_supercell, state%velocities)
-         end if
-      end if
+      ! if (supercell_check_only) then
+      !    if (allocated(state%positions_supercell)) &
+      !       deallocate (state%positions_supercell)
+
+      ! FIXME: This routine actually does nothing if the number of sites and
+      ! the number of supercell sites is the same, which it would be...
+
+      !    allocate (state%positions_supercell(1:3, 1:state%n_sites_supercell))
+      !    state%positions_supercell = state%positions(1:3, 1:state%n_sites_supercell)
+      !    call move_alloc(state%positions_supercell, state%positions)
+      !    !       We need to comment this out here for nested sampling
+      !    !        if( do_md )then
+      !    if (allocated(state%velocities)) then
+      !       allocate (state%velocities_supercell(1:3, 1:state%n_sites_supercell))
+      !       state%velocities_supercell = state%velocities(1:3, 1:state%n_sites_supercell)
+      !       call move_alloc(state%velocities_supercell, state%velocities)
+      !    end if
+      ! end if
    end subroutine set_normal_cell
 
-   subroutine set_supercell(state, need_velocities)
+   subroutine set_supercell(state)!, need_velocities)
       type(state_t), intent(inout) :: state
-      logical, intent(in) :: need_velocities
+      !logical, intent(in) :: need_velocities
       integer :: counter
       integer :: i, k2, j2, i2
 
@@ -263,9 +288,10 @@ contains
                   state%positions_supercell(1:3, counter) = state%positions(1:3, i) + dfloat(i2 - 1)*state%a_box(1:3) &
                                                             + dfloat(j2 - 1)*state%b_box(1:3) &
                                                             + dfloat(k2 - 1)*state%c_box(1:3)
-                  if (need_velocities) then
-                     state%velocities_supercell(1:3, counter) = state%velocities(1:3, i)
-                  end if
+                  ! if (need_velocities) then
+                  !    state%velocities_supercell(1:3, counter) = state%velocities(1:3, i)
+                  ! end if
+
                   !              species_supercell(:, counter) = species(:, i)
                   state%xyz_species_supercell(counter) = state%xyz_species(i)
                   state%species_supercell(counter) = state%species(i)
@@ -276,9 +302,9 @@ contains
 
       call move_alloc(state%positions_supercell, state%positions)
 
-      if (need_velocities) then
-         call move_alloc(state%velocities_supercell, state%velocities)
-      end if
+      ! if (need_velocities) then
+      !    call move_alloc(state%velocities_supercell, state%velocities)
+      ! end if
 
       state%a_box = dfloat(state%indices(1))*state%a_box
       state%b_box = dfloat(state%indices(2))*state%b_box

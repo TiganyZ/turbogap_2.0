@@ -39,13 +39,15 @@ module control
               !! main loop, as there are some long expressions when just using
               !! the control type
    type perform_t
+                                                                 !! Main options
       logical :: md_step = .false.
       logical :: mc_step = .false.
       logical :: nested_step = .false.
-      logical :: randomize_velocities = .false.
 
       logical :: neighbors = .false.
+      logical :: randomize_velocities = .false.
 
+                                                                  !! GAP options
       logical :: gap_soap = .false.
       logical :: gap_2b = .false.
       logical :: gap_3b = .false.
@@ -53,6 +55,7 @@ module control
 
       logical :: local_properties = .false.
 
+                                                         !! Experimental options
       logical :: exp = .false.
 
       logical :: pdf = .false.
@@ -60,6 +63,15 @@ module control
       logical :: xrd = .false.
       logical :: nd = .false.
       logical :: xps = .false.
+
+                                                                   !! MD options
+      logical :: scale_box = .false.
+      logical :: thermostat_berendsen = .false.
+      logical :: thermostat_bussi = .false.
+      logical :: barostat_berendsen = .false.
+      logical :: gradient_descent = .false.
+      logical :: gradient_descent_box = .false.
+      logical :: gradient_descent_box_ortho = .false.
 
       logical :: read_xyz = .false.
       logical :: write_xyz = .false.
@@ -76,6 +88,7 @@ module control
 
                                                               !! Main procedures
       logical :: prediction = .false.
+      logical :: only_prediction = .false.
       logical :: md = .false.
       logical :: mc = .false.
       logical :: exp = .false.

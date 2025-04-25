@@ -27,6 +27,7 @@ PROGRAMS := turbogap
 
 
 SRC := kinds.f90 \
+       constants.f90 \
        error.f90 \
        printing.f90 \
        types.f90 \
@@ -36,7 +37,6 @@ SRC := kinds.f90 \
        functions.f90 \
        splines.f90 \
        calculation.f90 \
-       misc.f90 \
        \
        md_types.f90 \
        mc_types.f90 \
@@ -50,7 +50,13 @@ SRC := kinds.f90 \
        soap_turbo.f90 \
        \
        neighbors_interface.f90 \
+       \
        md_utils.f90 \
+       \
+       write_xyz.f90 \
+       \
+       \
+       resamplekin.f90 \
        md_interface.f90 \
        mc_interface.f90 \
        state_interface.f90 \
@@ -65,8 +71,6 @@ SRC := kinds.f90 \
        read_exp.f90 \
        read_files.f90 \
        \
-       write_xyz.f90 \
-       \
        local_properties.f90 \
        gap.f90 \
        gap_interface.f90 \
@@ -76,6 +80,8 @@ SRC := kinds.f90 \
        mpi_utils.f90 \
        \
        control_interface.f90 \
+       \
+       misc.f90 \
        \
        turbogap_main.f90
 
@@ -146,6 +152,9 @@ $(BUILD_DIR)/%.o: src/utils/%.f90 | $$(@D)
 	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: src/control/%.f90 | $$(@D)
+	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: src/third_party/bussi_thermostat/%.f90 | $$(@D)
 	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: src/md/%.f90 | $$(@D)

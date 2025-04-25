@@ -116,6 +116,7 @@ contains
     integer, intent(in) :: rank
     logical :: decision
     decision = ( &
+                          (do_%prediction .and. (.not. do_%md ) .and. (.not. do_%mc)) .or. &
                           (do_%md .and. (.not. do_%mc) .and. &
                            (modulo(md%i_step, do_%write_xyz) == 0)) .or. &
                           (do_%mc .and. (.not. do_%md) .and. &

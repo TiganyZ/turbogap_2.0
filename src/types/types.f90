@@ -83,7 +83,7 @@ module types
       ! Global number of atom pairs
       integer :: n_atom_pairs_total = 0
       real(dp) :: rcut_max = 4.0_dp
-      real(dp) :: neighbors_buffer = 0.0_dp
+      real(dp) :: buffer = 0.0_dp
 
       real(dp), allocatable :: rjs(:)
       real(dp), allocatable :: phis(:)
@@ -114,9 +114,13 @@ module types
       real(dp) :: c_box(3) = [0.0_dp, 0.0_dp, 1.0_dp]
       integer  :: indices(3) = 1
       integer  :: indices_prev(3) = 1
+      real(dp) :: volume = 1.0_dp
 
       ! Dynamical state
       real(dp), allocatable    :: positions(:, :)
+                                 !! Positions array wrapped around the unit cell
+      real(dp), allocatable    :: positions_wrapped(:, :)
+
       real(dp), allocatable    :: velocities(:, :)
       real(dp), allocatable    :: positions_supercell(:, :)
       real(dp), allocatable    :: velocities_supercell(:, :)
@@ -159,6 +163,30 @@ module types
       real(dp) :: virial(3, 3) = 0.0_dp
       real(dp) :: energy = 0.0_dp
    end type calculation_t
+
+                              !! Container type for all energies for convenience
+   type energy_t
+      real(dp) :: total = 0.0_dp
+      real(dp) :: kinetic = 0.0_dp
+
+      real(dp) :: gap_soap = 0.0_dp
+      real(dp) :: gap_2b = 0.0_dp
+      real(dp) :: gap_3b = 0.0_dp
+      real(dp) :: gap_core_pot = 0.0_dp
+
+      real(dp) :: vdw = 0.0_dp
+      real(dp) :: estat = 0.0_dp
+
+                                  !! Experimental energies, exp is total of them
+      real(dp) :: exp = 0.0_dp
+
+      real(dp) :: pdf = 0.0_dp
+      real(dp) :: sf = 0.0_dp
+      real(dp) :: xrd = 0.0_dp
+      real(dp) :: nd = 0.0_dp
+
+      real(dp) :: xps = 0.0_dp
+   end type energy_t
 
                                                 !! Thermodynamic state variables
    type thermo_t

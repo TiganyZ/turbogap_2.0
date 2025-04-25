@@ -89,9 +89,11 @@ contains
          call reset_calculation(this_gap_core_pot, do_forces)
       end if
 
-      !! Reset Experimental Calculations
+                                              !! Reset Experimental Calculations
       if (perform%pdf) &
          call reset_calculation(pdf, do_forces)
+      if (perform%sf) &
+         call reset_calculation(sf, do_forces)
       if (perform%xrd) &
          call reset_calculation(xrd, do_forces)
       if (perform%nd) &

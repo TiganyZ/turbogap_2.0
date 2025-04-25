@@ -38,19 +38,19 @@ contains
       type(control_t) :: do_
       character(len=*), intent(in) :: mode
 
-      if (mode == "md") then
+      if (trim(mode) == "md") then
          do_%md = .true.
          do_%prediction = .true.
          do_%forces = .true.
          do_%derivatives = .true.
-      else if (mode == "mc") then
+      else if (trim(mode) == "mc") then
          do_%mc = .true.
          do_%prediction = .true.
          do_%forces = .false.
          do_%derivatives = .false.
-      else if (mode == "soap") then
+      else if (trim(mode) == "soap") then
          do_%write_soap = .true.
-      else if (mode == "predict") then
+      else if (trim(mode) == "predict") then
          do_%prediction = .true.
          do_%forces = .true.
       end if

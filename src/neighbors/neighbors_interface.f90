@@ -31,6 +31,7 @@ module neighbors_interface
    use types, only: state_t, neighbors_t, split_t
    use functions, only: cross_product
    use timing, only: time_start, time_end
+   use printing, only: print_debug, print_parameter
    use mpi
    implicit none
 
@@ -39,6 +40,10 @@ contains
 !**************************************************************************
 ! This subroutine reads in the XYZ file and builds the lists of neighbors, the spherical
 ! coordinates, etc.
+!
+   subroutine deallocate_neighbors(neighbors)
+      type(neighbors_t), intent(out) :: neighbors
+   end subroutine deallocate_neighbors
 !
 
    subroutine collect_neighbors(neighbors, rebuild_neighbors_list, &
@@ -79,7 +84,11 @@ contains
          call mpi_reduce(neighbors%n_neigh, neighbors%n_neigh_global, &
                          n_sites, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-         call move_alloc(neighbors%n_neigh_global, neighbors%n_neigh)
+         if (.not. allocated(neighbors%n_neigh)) &
+            allocate (neighbors%n_neigh(1:n_sites))
+
+         if (rank == 0) &
+            call move_alloc(neighbors%n_neigh_global, neighbors%n_neigh)
 
          call mpi_bcast(neighbors%n_neigh, n_sites, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
@@ -162,7 +171,7 @@ contains
             write (*, *) 'orthorhombic; this will lead to slower |'
             write (*, *) 'code execution. This warning will be   |'
             write (*, *) 'printed only once. If you have more    |'
-            write (*, *) 'than one structure in your NEIGHBORS % XYZ file,   |'
+            write (*, *) 'than one structure in your XYZ file,   |'
             write (*, *) 'you may also have several instances of |'
             write (*, *) 'non-orthorhombic cells.                |'
             write (*, *) '                                       |'
@@ -182,7 +191,7 @@ contains
             write (*, *) 'inefficient neighbor list builds. This |'
             write (*, *) 'warning will be printed only once. If  |'
             write (*, *) 'you have more than one structure in    |'
-            write (*, *) 'your NEIGHBORS % XYZ file, you may also have       |'
+            write (*, *) 'your XYZ file, you may also have       |'
             write (*, *) 'several instances of non-orthorhombic  |'
             write (*, *) 'cells.                                 |'
             write (*, *) '                                       |'

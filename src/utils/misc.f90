@@ -33,6 +33,7 @@ module misc
    use timer, only: times_t
    use printing, only: print_error, print_parameter, print_separator, print_line
    use error, only: turbogap_abort
+   use md_interface, only: initialize_thermo_file
    implicit none
 
 contains
@@ -56,7 +57,7 @@ contains
       ! end if
 
       !   We increase rcut_max by the neighbors buffer
-      neighbors%rcut_max = neighbors%rcut_max + neighbors%neighbors_buffer
+      neighbors%rcut_max = neighbors%rcut_max + neighbors%buffer
    end subroutine get_rcut_max
 
    !*************************************************************************
@@ -84,6 +85,7 @@ contains
       split%i_beg = 1
       split%i_end = n_sites
 #endif
+
    end subroutine split_tasks
 
    !*************************************************************************
@@ -233,7 +235,7 @@ contains
 
    subroutine open_files(rank, do_, file_trajectory, opened_file_trajectory, &
                          file_thermo, opened_file_thermo, file_mc, opened_file_mc, &
-                         file_mc_log, opened_file_mc_log)
+                         file_mc_log, opened_file_mc_log, format_thermo)
       type(control_t), intent(in) :: do_
       integer, intent(in) :: rank
 
@@ -243,6 +245,7 @@ contains
       integer, intent(in) :: file_mc_log
       integer, intent(in) :: file_thermo
       integer, intent(in) :: file_trajectory
+      character*1024, intent(out) :: format_thermo
       if (rank == 0) then
 
          if (do_%md .or. do_%hybrid_mc) then
@@ -261,6 +264,11 @@ contains
          end if
 
       end if
+
+      if (opened_file_thermo) then
+         call initialize_thermo_file(file_thermo, do_, format_thermo)
+      end if
+
    end subroutine open_files
 
 end module misc

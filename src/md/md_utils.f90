@@ -28,11 +28,18 @@
 
 module md_utils
    use kinds, only: dp
+   use types, only: state_t, calculation_t
    use functions, only: cross_product
    use neighbors_interface, only: get_distance, get_fractional_coordinates
    implicit none
 
 contains
+
+   subroutine get_volume(state)
+      type(state_t), intent(inout) :: state
+      state%volume = dot_product(cross_product(state%a_box, state%b_box), state%c_box) &
+                     /(dfloat(state%indices(1)*state%indices(2)*state%indices(3)))
+   end subroutine get_volume
 
 !**************************************************************************
 ! Verlet is two subroutines
@@ -86,25 +93,20 @@ contains
       end if
 
    end subroutine
-!**************************************************************************
 
-!**************************************************************************
    subroutine velocity_verlet(positions, positions_prev, velocities, &
                               forces, forces_prev, masses, dt, dt_prev, &
-                              first_step, fix_atom, optimize_for_atoms)
+                              first_step, fix_atom)
 
       implicit none
 
 !   Input variables
       real*8, intent(inout) :: positions(:, :), positions_prev(:, :), velocities(:, :), &
-                               forces_prev(:, :)
-      real*8, intent(in) :: forces(:, :), masses(:), dt, dt_prev
+                               forces_prev(:, :), dt_prev
+      real*8, intent(in) :: forces(:, :), masses(:), dt
       logical, intent(in) :: first_step, fix_atom(:, :)
-
-      integer, intent(in) :: optimize_for_atoms(:)
-
 !   Internal variables
-      integer :: n_sites, i, j, k
+      integer :: n_sites, i, j
 
       n_sites = size(masses)
 
@@ -113,9 +115,7 @@ contains
 
 !   velocities are given at t-dt (except for the first step, when they're given for t); compute for t
       if (.not. first_step) then
-         do k = 1, size(optimize_for_atoms)        !! do vv only for specified group of atoms
-            i = optimize_for_atoms(k)
-            !do i = 1, n_sites
+         do i = 1, n_sites
 !        velocities(1:3, i) = velocities(1:3, i) + 0.5d0 * (forces(1:3, i) + forces_prev(1:3, i))/masses(i) * dt
             do j = 1, 3
                if (.not. fix_atom(j, i)) then
@@ -129,9 +129,7 @@ contains
 !   positions are given at t; compute for t+dt
       positions_prev = positions
       forces_prev = forces
-      do k = 1, size(optimize_for_atoms)        !! do vv only for specified group of atoms
-         i = optimize_for_atoms(k)
-         !do i = 1, n_sites
+      do i = 1, n_sites
 !     positions(1:3, i) = positions(1:3, i) + velocities(1:3, i)*dt + 0.5d0*forces(1:3, i)/masses(i)*dt**2
          do j = 1, 3
             if (.not. fix_atom(j, i)) then
@@ -140,48 +138,126 @@ contains
          end do
       end do
 
-    !! Modification dt_prev instead of dt is needed for variable time-step situations
-    !! since the steps in VV algorithm is followeed like this
-    !! 1; 2,3,1; 2,3,1; 2,3,1; ...... for every MD step. Here 1 of VV is of current MD step
-    !! but 2,3 of the VV are of the previous MD step. [2 and 3 of VV of MD step 0 is from the
-    !! given input atom_file].
+      dt_prev = dt        !! minimum modification for variable time-step situations
 
-    !! Also, all the processes that are dependent on
-    !! the time step and velocities, called after the VV algorithm here has to use the previous
-    !! time step, not the current time step because step 3 of VV where velocity is calculated
-    !! uses the previous time step.
    end subroutine
 !**************************************************************************
+!**************************************************************************
+!    subroutine velocity_verlet(positions, positions_prev, velocities, &
+!                               forces, forces_prev, masses, dt, dt_prev, &
+!                               first_step, fix_atom, optimize_for_atoms)
+
+!       implicit none
+
+! !   Input variables
+!       real*8, intent(inout) :: positions(:, :), positions_prev(:, :), velocities(:, :), &
+!                                forces_prev(:, :)
+!       real*8, intent(in) :: forces(:, :), masses(:), dt, dt_prev
+!       logical, intent(in) :: first_step, fix_atom(:, :)
+
+!       integer, intent(in) :: optimize_for_atoms(:)
+
+! !   Internal variables
+!       integer :: n_sites, i, j, k
+
+!       n_sites = size(masses)
+
+! !   After this whole routine, velocities and positions_prev are synchronous. positions
+! !   is dt ahead of velocities
+
+! !   velocities are given at t-dt (except for the first step, when they're given for t); compute for t
+!       if (.not. first_step) then
+!          do k = 1, size(optimize_for_atoms)        !! do vv only for specified group of atoms
+!             i = optimize_for_atoms(k)
+!             !do i = 1, n_sites
+! !        velocities(1:3, i) = velocities(1:3, i) + 0.5d0 * (forces(1:3, i) + forces_prev(1:3, i))/masses(i) * dt
+!             do j = 1, 3
+!                if (.not. fix_atom(j, i)) then
+!                   velocities(j, i) = velocities(j, i) + 0.5d0*(forces(j, i) + forces_prev(j, i))/masses(i)*dt_prev        ! dt
+!                else
+!                   velocities(j, i) = 0.d0
+!                end if
+!             end do
+!          end do
+!       end if
+! !   positions are given at t; compute for t+dt
+!       positions_prev = positions
+!       forces_prev = forces
+!       do k = 1, size(optimize_for_atoms)        !! do vv only for specified group of atoms
+!          i = optimize_for_atoms(k)
+!          !do i = 1, n_sites
+! !     positions(1:3, i) = positions(1:3, i) + velocities(1:3, i)*dt + 0.5d0*forces(1:3, i)/masses(i)*dt**2
+!          do j = 1, 3
+!             if (.not. fix_atom(j, i)) then
+!                positions(j, i) = positions(j, i) + velocities(j, i)*dt + 0.5d0*forces(j, i)/masses(i)*dt**2
+!             end if
+!          end do
+!       end do
+
+!     !! Modification dt_prev instead of dt is needed for variable time-step situations
+!     !! since the steps in VV algorithm is followeed like this
+!     !! 1; 2,3,1; 2,3,1; 2,3,1; ...... for every MD step. Here 1 of VV is of current MD step
+!     !! but 2,3 of the VV are of the previous MD step. [2 and 3 of VV of MD step 0 is from the
+!     !! given input atom_file].
+
+!     !! Also, all the processes that are dependent on
+!     !! the time step and velocities, called after the VV algorithm here has to use the previous
+!     !! time step, not the current time step because step 3 of VV where velocity is calculated
+!     !! uses the previous time step.
+!    end subroutine
+! !**************************************************************************
 
 !**************************************************************************
 ! Berendsen's velocity rescaling thermostat
 !
-   subroutine berendsen_thermostat(vel, T0, T, tau, dt, thermostat_for_atoms)
+   subroutine berendsen_thermostat(vel, T0, T, tau, dt)
 
       implicit none
 
       real*8, intent(inout) :: vel(:, :)
       real*8, intent(in) :: T0, T, tau, dt
-      integer, intent(in) :: thermostat_for_atoms(:)
       real*8 :: f
-      integer :: Np, i, k
+      integer :: Np, i
 
-        !! thermostat only specified group of atoms
-      Np = size(thermostat_for_atoms)
-      !Np = size(vel, 2)
-      !do i = 1, Np
+      Np = size(vel, 2)
 
       f = dsqrt(1.d0 + dt/tau*(T0/T - 1.d0))
 
       if (T > 0.d0) then
-         do k = 1, Np
-            i = thermostat_for_atoms(k)
+         do i = 1, Np
             vel(1:3, i) = vel(1:3, i)*f
          end do
       end if
 
    end subroutine
-!**************************************************************************
+! !**************************************************************************
+
+!    subroutine berendsen_thermostat(vel, T0, T, tau, dt, thermostat_for_atoms)
+
+!       implicit none
+
+!       real*8, intent(inout) :: vel(:, :)
+!       real*8, intent(in) :: T0, T, tau, dt
+!       integer, intent(in) :: thermostat_for_atoms(:)
+!       real*8 :: f
+!       integer :: Np, i, k
+
+!         !! thermostat only specified group of atoms
+!       Np = size(thermostat_for_atoms)
+!       !Np = size(vel, 2)
+!       !do i = 1, Np
+
+!       f = dsqrt(1.d0 + dt/tau*(T0/T - 1.d0))
+
+!       if (T > 0.d0) then
+!          do k = 1, Np
+!             i = thermostat_for_atoms(k)
+!             vel(1:3, i) = vel(1:3, i)*f
+!          end do
+!       end if
+
+!    end subroutine
+! !**************************************************************************
 
 !**************************************************************************
    subroutine remove_cm_vel(vel, M)
@@ -213,33 +289,50 @@ contains
 !**************************************************************************
 
 !**************************************************************************
-   subroutine wrap_pbc(positions, a_box, b_box, c_box)
+   subroutine wrap_pbc(state)
+      type(state_t), intent(inout) :: state
 
-      implicit none
-
-      real*8, intent(inout) :: positions(:, :)
-      real*8, intent(in) :: a_box(1:3), b_box(1:3), c_box(1:3)
       real*8 :: dist(1:3), d
       integer :: Np, i, i_shift(1:3)
 
-      Np = size(positions, 2)
-
-!    mid(1:3) = 0.5d0 * (a_box(1:3) + b_box(1:3) + c_box(1:3))
-
-!    do i = 1, Np
-!      call get_distance( mid(1:3), positions(1:3, i), a_box(1:3), b_box(1:3), c_box(1:3), &
-!                         [.true., .true., .true.], dist, d, i_shift(1:3))
-!      positions(1:3, i) = mid(1:3) + dist(1:3) &
-!                          - i_shift(1)*a_box(1:3) - i_shift(2)*b_box(1:3) - i_shift(3)*c_box(1:3)
-!    end do
+      Np = size(state%positions_wrapped, 2)
 
       do i = 1, Np
-         call get_distance([0.d0, 0.d0, 0.d0], positions(1:3, i), a_box(1:3), b_box(1:3), c_box(1:3), &
+         call get_distance([0.d0, 0.d0, 0.d0], state%positions(1:3, i), &
+                           state%a_box(1:3)/dfloat(state%indices(1)), &
+                           state%b_box(1:3)/dfloat(state%indices(2)), &
+                           state%c_box(1:3)/dfloat(state%indices(3)), &
                            [.true., .true., .true.], dist, d, i_shift(1:3))
-         positions(1:3, i) = positions(1:3, i) - i_shift(1)*a_box(1:3) - i_shift(2)*b_box(1:3) - i_shift(3)*c_box(1:3)
-      end do
 
-   end subroutine
+         state%positions_wrapped(1:3, i) = state%positions(1:3, i) &
+                                           - i_shift(1)*state%a_box(1:3)/dfloat(state%indices(1)) &
+                                           - i_shift(2)*state%b_box(1:3)/dfloat(state%indices(2)) &
+                                           - i_shift(3)*state%c_box(1:3)/dfloat(state%indices(3))
+      end do
+   end subroutine wrap_pbc
+
+   subroutine wrap_pbc_supercell(state)
+      type(state_t), intent(inout) :: state
+
+      real*8 :: dist(1:3), d
+      integer :: Np, i, i_shift(1:3)
+
+      Np = size(state%positions, 2)
+
+      do i = 1, Np
+         call get_distance([0.d0, 0.d0, 0.d0], state%positions(1:3, i), &
+                           state%a_box(1:3), &
+                           state%b_box(1:3), &
+                           state%c_box(1:3), &
+                           [.true., .true., .true.], dist, d, i_shift(1:3))
+
+         state%positions(1:3, i) = state%positions(1:3, i) &
+                                   - i_shift(1)*state%a_box(1:3) &
+                                   - i_shift(2)*state%b_box(1:3) &
+                                   - i_shift(3)*state%c_box(1:3)
+      end do
+   end subroutine wrap_pbc_supercell
+
 !**************************************************************************
 
 !**************************************************************************
@@ -369,8 +462,6 @@ contains
       deallocate (d)
 
    end subroutine
-!**************************************************************************
-
 !**************************************************************************
    subroutine gradient_descent(positions, positions_prev, velocities, &
                                forces, forces_prev, masses, max_opt_step, &

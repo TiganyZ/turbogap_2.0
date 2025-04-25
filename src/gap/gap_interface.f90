@@ -34,6 +34,7 @@ module gap_interface
    use control, only: control_t
    use types, only: state_t, neighbors_t, soap_turbo, local_property_soap_turbo
    use timing, only: time_start, time_end
+   use printing, only: print_parameter
 contains
 
 !**************************************************************************
@@ -271,14 +272,14 @@ contains
                local_properties_cart_der = 0._dp
             end if
 
-            call local_property_predict(soap,&
-                 & local_property_models(i4)%Qs,&
-                 & local_property_models(i4)%alphas,&
-                 & local_property_models(i4)%V0,&
-                 & local_property_models(i4)%delta,&
-                 & local_property_models(i4)%zeta, local_properties,&
-                 & do_derivatives, soap_cart_der, n_neigh,&
-                 & local_properties_cart_der)
+            call local_property_predict(soap, &
+                                        local_property_models(i4)%Qs, &
+                                        local_property_models(i4)%alphas, &
+                                        local_property_models(i4)%V0, &
+                                        local_property_models(i4)%delta, &
+                                        local_property_models(i4)%zeta, local_properties, &
+                                        do_derivatives, soap_cart_der, n_neigh, &
+                                        local_properties_cart_der)
 
             ! call local_property_predict( soap, Qs, alphas, V0, delta, zeta, &
             !      local_property, do_derivatives, soap_cart_der, n_neigh_out, &

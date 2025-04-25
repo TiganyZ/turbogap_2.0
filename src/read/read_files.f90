@@ -145,11 +145,9 @@ contains
 
             read (input, *, iostat=iostatus) cjunk, cjunk, species_info%n_species
             if (species_info%n_species < 1) then
-               write (*, *) '                                       |'
-               write (*, *) 'ERROR : n_species must be > 0           |  <-- ERROR'
-               write (*, *) '                                       |'
-               write (*, *) '.......................................|'
-               stop
+               if (rank == 0) &
+                  call print_error("n_species must be > 0")
+               call turbogap_abort()
             else
                if (rank == 0) &
                   call print_parameter("n_species", species_info%n_species)
@@ -351,9 +349,9 @@ contains
          keyword_found = .true.
       else if (keyword == 'neighbors_buffer') then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, neighbors%neighbors_buffer
+         read (input, *, iostat=iostatus) cjunk, cjunk, neighbors%buffer
          if (rank == 0) &
-            call print_parameter("neighbors_buffer", neighbors%neighbors_buffer)
+            call print_parameter("neighbors_buffer", neighbors%buffer)
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
       else if (keyword == 'radii') then

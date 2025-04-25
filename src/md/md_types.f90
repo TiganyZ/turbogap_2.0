@@ -35,13 +35,17 @@ module md_types
       integer  :: n_steps = -1
                                                       !! Number of md iterations
       integer  :: i_step = -1
+                                              !! Number of relaxation iterations
+      integer  :: gd_i_step = -1
+      logical  :: gd_box_do_pos = .false.
+      logical  :: restart_box_optim = .false.
                                                                  !! MD time step
       real(dp) :: step = 1.0_dp
 
                                                            !! MD time step taken
       real(dp) :: time = 0.0_dp
       real(dp) :: time_step = 1.0_dp
-      real(dp) :: time_step_prev
+      real(dp) :: time_step_prev = 1.0_dp
 
                                        !! Tolerances for equilibrium convergence
       real(dp) :: e_tol = 1.d-6
@@ -72,12 +76,12 @@ module md_types
                                                            !! Type of step to do
                                                         !! vv == Velocity Verlet
                                                        !! gd == Gradient descent
-      character*8 :: optimize = 'vv'
+      character*16 :: optimize = 'vv'
 
                                                     !! Thermostat/barostat types
       character*32 :: thermostat = 'bussi'
       character*32 :: barostat = 'berendsen'
-      logical :: barostat_sym = .false.
+      character*32 :: barostat_sym = "iso"
 
                                                                   !! Box scaling
       logical :: scale_box
@@ -89,6 +93,16 @@ module md_types
                    0.d0, 0.d0, 1.d0], [3, 3])
 
       logical :: randomize_velocities = .false.
+
+      real(dp), allocatable :: positions_diff(:, :)
+      real(dp), allocatable :: positions_prev(:, :)
+      real(dp), allocatable :: forces_prev(:, :)
+
+      integer, allocatable :: optimize_for_atoms(:)
+      integer, allocatable :: thermostat_for_atoms(:)
+
+      real(dp) :: energy_prev
+      real(dp) :: instant_pressure_prev
 
    end type md_t
 
