@@ -65,14 +65,6 @@ module control
       logical :: xps = .false.
 
                                                                    !! MD options
-      logical :: scale_box = .false.
-      logical :: thermostat_berendsen = .false.
-      logical :: thermostat_bussi = .false.
-      logical :: barostat_berendsen = .false.
-      logical :: gradient_descent = .false.
-      logical :: gradient_descent_box = .false.
-      logical :: gradient_descent_box_ortho = .false.
-
       logical :: read_xyz = .false.
       logical :: write_xyz = .false.
       logical :: write_thermo = .false.

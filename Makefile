@@ -38,6 +38,7 @@ SRC := kinds.f90 \
        splines.f90 \
        calculation.f90 \
        \
+       \
        md_types.f90 \
        mc_types.f90 \
        vdw_types.f90 \
@@ -56,10 +57,11 @@ SRC := kinds.f90 \
        write_xyz.f90 \
        \
        \
+       state_interface.f90 \
        resamplekin.f90 \
        md_interface.f90 \
+       mc_utils.f90 \
        mc_interface.f90 \
-       state_interface.f90 \
        \
        read_utils.f90 \
        read_control.f90 \
@@ -86,6 +88,10 @@ SRC := kinds.f90 \
        turbogap_main.f90
 
 
+       # \
+       # historylist.f90 \
+       # sqnm.f90 \
+       # periodic_optimizer.f90 \
 
        # read.f90 \
        # read_mc.f90 \
@@ -169,6 +175,10 @@ $(BUILD_DIR)/%.o: src/mpi/%.f90 | $$(@D)
 
 $(BUILD_DIR)/%.o: src/madlib/%.f90 | $$(@D)
 	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
+
+# stable quasi newton optimizer
+# $(BUILD_DIR)/%.o: src/third_party/vc-sqnm/src/fortran/%.f90 | $$(@D)
+# 	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
 
 
 $(BUILD_DIR)/%.o: src/soap_turbo/src/%.f90 | $$(@D)

@@ -96,14 +96,14 @@ contains
   end function decide_mc
 
   pure function decide_randomize_velocities( md_randomize_velocities,&
-       & perform_md_step, md_i_step, allocated_velocities) result(decision)
+       & do_md, md_i_step, allocated_velocities) result(decision)
     logical, intent(in) :: md_randomize_velocities
-    logical, intent(in) :: perform_md_step
+    logical, intent(in) :: do_md
     integer, intent(in) :: md_i_step
     logical, intent(in) :: allocated_velocities
     logical :: decision
 
-    decision = ( perform_md_step .and. md_randomize_velocities .and. &
+    decision = ( do_md .and. md_randomize_velocities .and. &
          (md_i_step == 0) .and. allocated_velocities )
 
   end function decide_randomize_velocities

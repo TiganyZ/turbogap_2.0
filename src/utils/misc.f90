@@ -29,11 +29,12 @@
 module misc
    use kinds, only: dp
    use control, only: control_t
-   use types, only: input_parameters, neighbors_t, split_t
+   use types, only: input_parameters, neighbors_t, split_t, energy_t
    use timer, only: times_t
-   use printing, only: print_error, print_parameter, print_separator, print_line
+   use printing, only: print_error, print_parameter, print_separator, print_line, print_message, print_small_message
    use error, only: turbogap_abort
    use md_interface, only: initialize_thermo_file
+   use mc_utils, only: initialize_mc_log_file
    implicit none
 
 contains
@@ -235,7 +236,7 @@ contains
 
    subroutine open_files(rank, do_, file_trajectory, opened_file_trajectory, &
                          file_thermo, opened_file_thermo, file_mc, opened_file_mc, &
-                         file_mc_log, opened_file_mc_log, format_thermo)
+                         file_mc_log, opened_file_mc_log, format_thermo, format_mc_log, n_species)
       type(control_t), intent(in) :: do_
       integer, intent(in) :: rank
 
@@ -246,6 +247,8 @@ contains
       integer, intent(in) :: file_thermo
       integer, intent(in) :: file_trajectory
       character*1024, intent(out) :: format_thermo
+      character*1024, intent(out) :: format_mc_log
+      integer, intent(in) :: n_species
       if (rank == 0) then
 
          if (do_%md .or. do_%hybrid_mc) then
@@ -269,6 +272,40 @@ contains
          call initialize_thermo_file(file_thermo, do_, format_thermo)
       end if
 
+      if (opened_file_mc_log) then
+         call initialize_mc_log_file(file_mc_log, do_, n_species, format_mc_log)
+      end if
+
    end subroutine open_files
+
+   subroutine print_energies(energy, do_)
+      type(energy_t), intent(in) :: energy
+      type(control_t), intent(in) :: do_
+
+      call print_separator(' ')
+      call print_small_message("Energies")
+
+      call print_parameter("Energy total", energy%total, "eV")
+
+      if (do_%md) &
+         call print_parameter("Energy kinetic", energy%kinetic, "eV")
+
+      call print_parameter("Energy gap_soap", energy%gap_soap, "eV")
+      call print_parameter("Energy gap_2b", energy%gap_2b, "eV")
+      call print_parameter("Energy gap_3b", energy%gap_3b, "eV")
+      call print_parameter("Energy gap_core_pot", energy%gap_core_pot, "eV")
+      call print_parameter("Energy vdw", energy%vdw, "eV")
+      call print_parameter("Energy estat", energy%estat, "eV")
+
+      if (do_%exp) then
+         call print_parameter("Energy exp", energy%exp, "eV")
+         call print_parameter("Energy pdf", energy%pdf, "eV")
+         call print_parameter("Energy sf", energy%sf, "eV")
+         call print_parameter("Energy xrd", energy%xrd, "eV")
+         call print_parameter("Energy nd", energy%nd, "eV")
+         call print_parameter("Energy xps", energy%xps, "eV")
+      end if
+      call print_separator('-')
+   end subroutine print_energies
 
 end module misc

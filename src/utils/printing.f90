@@ -36,6 +36,41 @@ module printing
 
 contains
 
+   subroutine print_matrix_dp(values)
+      real(dp), intent(in) :: values(:, :)
+      character(len=max_length) :: string
+      character(len=max_length) :: temp_string
+      character(len=max_length) :: fmt
+      integer :: n1
+      integer :: n2
+      integer :: i
+      integer :: j
+
+      n1 = size(values, 1)
+      n2 = size(values, 2)
+
+      if (n1 < 10) then
+         write (fmt, '(A1,I1,A)') "(", n1, "(1X, F12.8))"
+      elseif (n1 < 100) then
+         write (fmt, '(A1,I2,A)') "(", n1, "(1X, F12.8))"
+      elseif (n1 < 1000) then
+         write (fmt, '(A1,I3,A)') "(", n1, "(1X, F12.8))"
+      elseif (n1 < 10000) then
+         write (fmt, '(A1,I4,A)') "(", n1, "(1X, F12.8))"
+      elseif (n1 < 100000) then
+         write (fmt, '(A1,I5,A)') "(", n1, "(1X, F12.8))"
+      elseif (n1 < 1000000) then
+         write (fmt, '(A1,I6,A)') "(", n1, "(1X, F12.8))"
+      else
+         write (fmt, '(A1,I7,A)') "(", n1, "(1X, F12.8))"
+      end if
+
+      do i = 1, n2
+         write (*, fmt) values(1:n1, i)
+      end do
+
+   end subroutine print_matrix_dp
+
    subroutine print_parameters(desc, values, unit)
       class(*), intent(in) :: values(:)
       character(len=*) :: desc

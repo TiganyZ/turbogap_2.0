@@ -85,7 +85,6 @@ contains
       state%indices_prev = state%indices
 
       if (.not. do_%supercell_check_only) then
-         print *, "Reading from xyz file!! "
          inquire (file=filename, number=i)
          if (i /= xyz_file) then
             open (unit=xyz_file, file=filename, status="old", action='read')
@@ -98,7 +97,7 @@ contains
 
          if (.not. do_%recalculate_supercell) then
                                                          !! Reallocate the state
-            call reallocate_state(state, do_%need_velocities, state%n_sites)
+            call reallocate_state(state, state%n_local_properties, do_%need_velocities, state%n_sites)
 
             call read_xyz_lines(xyz_file, iostatus, do_, state, species_info, &
                                 properties, has_velocities, do_%need_velocities)
@@ -106,6 +105,8 @@ contains
             !   Randomize state % velocities if state % velocities are not
             !   provided
             if (do_%need_velocities .and. .not. has_velocities) then
+               call reset_velocities(state, thermo, rank)
+            else if (do_%need_velocities .and. all(state%velocities == 0.0_dp)) then
                call reset_velocities(state, thermo, rank)
             end if
                          !!   Check if there are more structures in the xyz file
@@ -127,10 +128,6 @@ contains
       state%a_box = state%a_box/dfloat(state%indices_prev(1))
       state%b_box = state%b_box/dfloat(state%indices_prev(2))
       state%c_box = state%c_box/dfloat(state%indices_prev(3))
-
-      print *, "a_box ", state%a_box(1:3)
-      print *, "b_box ", state%b_box(1:3)
-      print *, "c_box ", state%c_box(1:3)
 
       call number_of_unit_cells_for_given_cutoff( &
          state%a_box, &
@@ -173,9 +170,17 @@ contains
 
       if (reallocate .or. .not. allocated(state%positions_wrapped)) then
          if (allocated(state%positions_wrapped)) deallocate (state%positions_wrapped)
-         allocate (state%positions_wrapped(1:3, size(state%positions, 2)), source=0.0_dp)
+         allocate (state%positions_wrapped(1:3, size(state%positions, 2)), source=state%positions)
       end if
 
+      ! Decide what to do next time!
+      if (do_%repeat_xyz .and. do_%only_prediction) then
+         do_%supercell_check_only = .false.
+         do_%recalculate_supercell = .false.
+      else
+         do_%repeat_xyz = .false.
+         do_%supercell_check_only = .true.
+      end if
    end subroutine read_xyz_file
 
    subroutine read_xyz_lines(xyz_file, iostatus, do_, state, species_info, properties, &

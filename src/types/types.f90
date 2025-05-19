@@ -100,70 +100,6 @@ module types
       logical, allocatable  :: do_list(:)
    end type neighbors_t
 
-   type state_t
-                           !! The state of the system, positions, velocities etc
-      ! Number of atoms
-      integer :: n_sites = -2
-      integer :: n_sites_prev = -1
-      integer :: n_sites_supercell = -1
-      integer :: this_n_sites_mpi = -1
-
-     !! Lattice parameters
-      real(dp) :: a_box(3) = [1.0_dp, 0.0_dp, 0.0_dp]
-      real(dp) :: b_box(3) = [0.0_dp, 1.0_dp, 0.0_dp]
-      real(dp) :: c_box(3) = [0.0_dp, 0.0_dp, 1.0_dp]
-      integer  :: indices(3) = 1
-      integer  :: indices_prev(3) = 1
-      real(dp) :: volume = 1.0_dp
-
-      ! Dynamical state
-      real(dp), allocatable    :: positions(:, :)
-                                 !! Positions array wrapped around the unit cell
-      real(dp), allocatable    :: positions_wrapped(:, :)
-
-      real(dp), allocatable    :: velocities(:, :)
-      real(dp), allocatable    :: positions_supercell(:, :)
-      real(dp), allocatable    :: velocities_supercell(:, :)
-
-      ! Species
-      integer, allocatable     :: species(:)
-      character*8, allocatable :: xyz_species(:)
-
-      integer, allocatable     :: species_supercell(:)
-      character*8, allocatable :: xyz_species_supercell(:)
-
-      real(dp), allocatable     :: masses(:)
-
-      ! Fix atom
-      logical, allocatable     :: fix_atom(:, :)
-
-      ! Energy
-      real(dp)    :: energy = 0.0_dp
-      real(dp)    :: E_kinetic = 0.0_dp
-
-      ! Instant temperature
-      real(dp)    :: instant_temp = 0.0_dp
-      real(dp)    :: instant_pressure = 0.0_dp
-   end type state_t
-
-                          !! Type for splitting atoms/neighbors to mpi processes
-   type split_t
-      integer :: i_beg
-      integer :: i_end
-      integer :: j_beg
-      integer :: j_end
-   end type split_t
-
-   type calculation_t
-     !! Type for generic calculation. Used for any calculation
-     !!   type.such as soap, 2b, 3b, xps etc
-
-      real(dp), allocatable :: energies(:)
-      real(dp), allocatable :: forces(:, :)
-      real(dp) :: virial(3, 3) = 0.0_dp
-      real(dp) :: energy = 0.0_dp
-   end type calculation_t
-
                               !! Container type for all energies for convenience
    type energy_t
       real(dp) :: total = 0.0_dp
@@ -187,6 +123,76 @@ module types
 
       real(dp) :: xps = 0.0_dp
    end type energy_t
+
+   type state_t
+                           !! The state of the system, positions, velocities etc
+      ! Number of atoms
+      integer :: n_sites = -2
+      integer :: n_sites_prev = -1
+      integer :: n_sites_supercell = -1
+      integer :: this_n_sites_mpi = -1
+
+     !! Lattice parameters
+      real(dp) :: a_box(3) = [1.0_dp, 0.0_dp, 0.0_dp]
+      real(dp) :: b_box(3) = [0.0_dp, 1.0_dp, 0.0_dp]
+      real(dp) :: c_box(3) = [0.0_dp, 0.0_dp, 1.0_dp]
+      integer  :: indices(3) = 1
+      integer  :: indices_prev(3) = 1
+      real(dp) :: volume = 1.0_dp
+      real(dp) :: volume_prev = 1.0_dp
+
+      ! Dynamical state
+      real(dp), allocatable    :: positions(:, :)
+                                 !! Positions array wrapped around the unit cell
+      real(dp), allocatable    :: positions_wrapped(:, :)
+
+      real(dp), allocatable    :: velocities(:, :)
+      real(dp), allocatable    :: positions_supercell(:, :)
+      real(dp), allocatable    :: velocities_supercell(:, :)
+
+      ! Species
+      integer, allocatable     :: species(:)
+      character*8, allocatable :: xyz_species(:)
+
+      integer, allocatable     :: species_supercell(:)
+      character*8, allocatable :: xyz_species_supercell(:)
+
+      real(dp), allocatable     :: masses(:)
+
+      ! Fix atom
+      logical, allocatable     :: fix_atom(:, :)
+
+      ! Local properties
+      integer :: n_local_properties
+      real(dp), allocatable :: local_properties(:, :)
+
+      ! Energy
+      real(dp)    :: energy = 0.0_dp
+      real(dp)    :: E_kinetic = 0.0_dp
+      type(energy_t) :: energies
+
+      ! Instant temperature
+      real(dp)    :: instant_temp = 0.0_dp
+      real(dp)    :: instant_pressure = 0.0_dp
+   end type state_t
+
+                          !! Type for splitting atoms/neighbors to mpi processes
+   type split_t
+      integer :: i_beg
+      integer :: i_end
+      integer :: j_beg
+      integer :: j_end
+   end type split_t
+
+   type calculation_t
+     !! Type for generic calculation. Used for any calculation
+     !!   type.such as soap, 2b, 3b, xps etc
+
+      real(dp), allocatable :: energies(:)
+      real(dp), allocatable :: forces(:, :)
+      real(dp) :: virial(3, 3) = 0.0_dp
+      real(dp) :: energy = 0.0_dp
+   end type calculation_t
 
                                                 !! Thermodynamic state variables
    type thermo_t

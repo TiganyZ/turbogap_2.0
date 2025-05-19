@@ -61,7 +61,7 @@ module turbogap_main
                                                         !! Main simulation types
    use md_types, only: md_t
    use md_interface, only: reset_velocities, calculate_md_step
-   use md_utils, only: wrap_pbc, get_volume
+   use md_utils, only: wrap_pbc, wrap_pbc_cell, get_volume
 
    use mc_types, only: mc_t
    use mc_interface ! , only: perform_mc
@@ -84,10 +84,11 @@ module turbogap_main
    use neighbors_interface, only: build_neighbors_list, collect_neighbors, deallocate_neighbors
 
    use calculate_gap_soap_mod, only: calculate_gap_soap
+   use gap, only: calculate_gap_2b, calculate_gap_3b, calculate_gap_core_pot
 
 #ifdef _MPIF90
    use mpi
-   use mpi_utils, only: collect_calculation
+   use mpi_utils, only: collect_calculation, broadcast_md, broadcast_mc
 #endif
 
    use timing, only: times_t, time_start, time_end, print_times
@@ -95,13 +96,11 @@ module turbogap_main
    use printing, only: print_parameter, print_separator, print_note, &
                        print_error, print_debug, print_small_message, &
                        print_message, print_line, print_end_of_execution, &
-                       print_parameters, printf_message, printf_small_message
+                       print_parameters, printf_message, printf_small_message, print_matrix_dp
 
    use misc, only: print_splash_screen, set_random_seed, get_turbogap_mode, &
-                   split_tasks, get_rcut_max, file_open, file_close, open_files
-
-   ! use soap_turbo_desc
-   ! use gap
+                   split_tasks, get_rcut_max, file_open, file_close, open_files, &
+                   print_energies
 
    ! use mc, only:                  &
    !    options_mc_t,                  &
@@ -192,6 +191,8 @@ contains
       type(calculation_t) :: xps
       type(calculation_t) :: vdw
 
+      type(calculation_t) :: exp
+
                  !! calculation_t objects to store some state while broadcasting
                                              !! NOTE: These could be made local?
       type(calculation_t) :: this_total
@@ -213,6 +214,7 @@ contains
       integer, allocatable          :: local_property_indexes(:)
       character*1024, allocatable   :: local_property_labels(:)
       real(dp), allocatable, target :: local_properties(:, :)
+      real(dp), allocatable         :: local_properties_prev(:, :)
       real(dp), allocatable, target :: local_properties_cart_der(:, :, :)
       real(dp), allocatable, target :: this_local_properties(:, :)
       real(dp), allocatable, target :: this_local_properties_cart_der(:, :, :)
@@ -264,6 +266,7 @@ contains
       logical :: opened_file_trajectory = .false.
 
       character*1024 :: format_thermo
+      character*1024 :: format_mc_log
 
       character*1024 :: energies_string = ""
 
@@ -364,7 +367,7 @@ contains
 
                !! Count and connect local properties to experimental/vdw options
       call check_local_properties(rank, do_, &
-                                  n_local_properties, &
+                                  state%n_local_properties, &
                                   n_local_properties_tot, &
                                   n_gap_soap, gap_soap_hypers, &
                                   local_property_labels, &
@@ -378,7 +381,9 @@ contains
 
       ! FIXME: Will add more types in here for the other rcut maxes later
       call get_rcut_max(neighbors)
-      call print_parameter("rcut_max", neighbors%rcut_max)
+
+      if (rank == 0) &
+         call print_parameter("rcut_max", neighbors%rcut_max)
 
 #ifdef _DEBUG
       if (rank == 0) then
@@ -390,19 +395,9 @@ contains
       !*************************************************************************
 
       !*************************************************************************
-                                                        !! Broadcast soap hypers
+                                                        !! Open files for output
 
 #ifdef _MPIF90
-      ! FIXME: Implement broadcasting routines for each of the gap descriptors
-      !
-      ! call time_start( time % mpi )
-      !
-      ! call broadcast_gap_soap( n_gap_soap, gap_soap_hypers )
-      ! call broadcast_gap_2b( n_gap_2b, gap_2b_hypers )
-      ! call broadcast_gap_3b( n_gap_3b, gap_3b_hypers )
-      !
-      ! call time_end( time % mpi )
-
       !! Open all files necessary to write to ( trajectory_out.xyz, thermo.log,
       !! mc.log, mc_all.xyz )
       call open_files(rank, do_, &
@@ -410,7 +405,13 @@ contains
                       file_thermo, opened_file_thermo, &
                       file_mc, opened_file_mc, &
                       file_mc_log, opened_file_mc_log, &
-                      format_thermo)
+                      format_thermo, format_mc_log, species_info%n_species)
+
+                                               !! Finished open files for output
+      !*************************************************************************
+
+      !*************************************************************************
+                                   !! Define what things to do during simulation
 
                             !! Setting that we will always do these calculations
       do_%only_prediction = (do_%prediction &
@@ -434,13 +435,8 @@ contains
       perform%xps = do_%xps
 
 #endif
-#ifdef _DEBUG
-      if (rank == 0) then
-         call print_debug("Finished broadcast soap hypers", "turbogap_main.f90")
-      end if
-#endif
 
-                                               !! Finished broadcast soap hypers
+                          !! Finished define what things to do during simulation
       !*************************************************************************
 
       !*************************************************************************
@@ -461,17 +457,12 @@ contains
 
          ! We decide what to do at the start of each loop for clarity
 
-         perform%md_step = (do_%md .and. rank == 0)
-         perform%mc_step = (do_%mc .and. (.not. do_%md) .and. rank == 0)
+         perform%md_step = (do_%md)
+         perform%mc_step = (do_%mc .and. (.not. do_%md))
 
                                                       !! Increment main counters
          if (perform%md_step) then
             md%i_step = md%i_step + 1
-
-            if (rank == 0) then
-               call print_parameter("md_i_step", md%i_step)
-               call print_parameter("md_n_steps", md%n_steps)
-            end if
          end if
 
          if (perform%mc_step) &
@@ -487,37 +478,37 @@ contains
          perform%write_xyz = decide_write_xyz(do_, md, mc, rank)
          perform%write_thermo = decide_write_thermo(do_, md, rank)
 
-         if (rank == 0) then
-            call print_parameter(" perform md_step ", perform%md_step)
-            call print_parameter(" perform mc_step ", perform%mc_step)
-            call print_parameter(" perform nested_step ", perform%nested_step)
-            call print_parameter(" perform randomize_velocities ", perform%randomize_velocities)
+         ! if (rank == 0) then
+         !    call print_parameter(" perform md_step ", perform%md_step)
+         !    call print_parameter(" perform mc_step ", perform%mc_step)
+         !    call print_parameter(" perform nested_step ", perform%nested_step)
+         !    call print_parameter(" perform randomize_velocities ", perform%randomize_velocities)
 
-            call print_parameter(" perform local properties ", perform%local_properties)
+         !    call print_parameter(" perform local properties ", perform%local_properties)
 
-            call print_parameter(" perform neighbors ", perform%neighbors)
+         !    call print_parameter(" perform neighbors ", perform%neighbors)
 
-            call print_parameter(" perform gap_soap ", perform%gap_soap)
-            call print_parameter(" perform gap_2b ", perform%gap_2b)
-            call print_parameter(" perform gap_3b ", perform%gap_3b)
-            call print_parameter(" perform gap_core_pot ", perform%gap_core_pot)
+         !    call print_parameter(" perform gap_soap ", perform%gap_soap)
+         !    call print_parameter(" perform gap_2b ", perform%gap_2b)
+         !    call print_parameter(" perform gap_3b ", perform%gap_3b)
+         !    call print_parameter(" perform gap_core_pot ", perform%gap_core_pot)
 
-            call print_parameter(" perform exp ", perform%exp)
+         !    call print_parameter(" perform exp ", perform%exp)
 
-            call print_parameter(" perform pdf ", perform%pdf)
-            call print_parameter(" perform sf ", perform%sf)
-            call print_parameter(" perform xrd ", perform%xrd)
-            call print_parameter(" perform nd ", perform%nd)
-            call print_parameter(" perform xps ", perform%xps)
+         !    call print_parameter(" perform pdf ", perform%pdf)
+         !    call print_parameter(" perform sf ", perform%sf)
+         !    call print_parameter(" perform xrd ", perform%xrd)
+         !    call print_parameter(" perform nd ", perform%nd)
+         !    call print_parameter(" perform xps ", perform%xps)
 
-            call print_parameter(" perform read_xyz ", perform%read_xyz)
-            call print_parameter(" perform write_xyz ", perform%write_xyz)
-            call print_parameter(" perform write_thermo ", perform%write_thermo)
-            call print_parameter(" perform overwrite ", perform%overwrite)
+         !    call print_parameter(" perform read_xyz ", perform%read_xyz)
+         !    call print_parameter(" perform write_xyz ", perform%write_xyz)
+         !    call print_parameter(" perform write_thermo ", perform%write_thermo)
+         !    call print_parameter(" perform overwrite ", perform%overwrite)
 
-            call print_parameter(" perform reallocate ", perform%reallocate)
-            call print_parameter(" perform broadcast ", perform%broadcast)
-         end if
+         !    call print_parameter(" perform reallocate ", perform%reallocate)
+         !    call print_parameter(" perform broadcast ", perform%broadcast)
+         ! end if
 
          !*************************************************************************
                                                              !! Reading xyz file
@@ -529,22 +520,6 @@ contains
             call read_xyz_file(rank, params%atoms_file, thermo, species_info, &
                                neighbors%rcut_max, state, do_, perform%reallocate)
 
-            if (rank == 0) then
-               if (.not. do_%supercell_check_only) then
-                  call print_parameter("n_sites", state%n_sites)
-                  call print_parameter("n_sites_supercell", state%n_sites_supercell)
-                  call print_parameters("n_xyz_unit_cells", state%indices)
-               end if
-
-            end if
-
-            if (do_%repeat_xyz) then
-               do_%supercell_check_only = .false.
-               do_%recalculate_supercell = .false.
-            else
-               do_%supercell_check_only = .true.
-            end if
-
             call time_end(time%xyz)
 
          end if
@@ -553,22 +528,24 @@ contains
 
          perform%randomize_velocities = decide_randomize_velocities( &
                                         md%randomize_velocities, &
-                                        perform%md_step, &
+                                        do_%md, &
                                         md%i_step, &
                                         allocated(state%velocities))
+
          if (perform%randomize_velocities) then
             call reset_velocities(state, thermo, rank)
-
-#ifdef _MPIF90
-            call time_start(time%mpi)
-
-            call mpi_bcast(state%positions, 3*state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call mpi_bcast(state%velocities, 3*state%n_sites, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-            call time_end(time%mpi)
-#endif
          end if
 
+! #ifdef _MPIF90
+!             call time_start(time%mpi)
+
+!             call mpi_bcast(state%positions, 3*state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+!             call time_end(time%mpi)
+! #endif
+!          end if
+
+         ! Calculate the volume
          call get_volume(state)
 
 #ifdef _DEBUG
@@ -710,12 +687,13 @@ contains
 
             call calculate_gap_soap(rank, do_, perform, &
                                     state, &
+                                    species_info, &
                                     neighbors, &
                                     n_gap_soap, gap_soap_hypers, &
                                     split, &
                                     params, &
                                     gap_soap, this_gap_soap, &
-                                    n_local_properties, &
+                                    state%n_local_properties, &
                                     local_property_indexes, &
                                     local_properties, this_local_properties, this_local_properties_pt, &
                                     local_properties_cart_der, &
@@ -725,6 +703,18 @@ contains
                                     time%gap_soap, &
                                     time%mpi, &
                                     time%local_properties)
+
+            if (perform%local_properties) then
+               if (perform%reallocate) then
+                  if (allocated(state%local_properties)) then
+                     deallocate (state%local_properties)
+                  end if
+                  allocate (state%local_properties, source=local_properties)
+               else
+                  state%local_properties = local_properties
+               end if
+            end if
+
          end if
 
 #ifdef _DEBUG
@@ -739,6 +729,12 @@ contains
          !*************************************************************************
                                                                        !! gap_2b
 
+         if (perform%gap_2b) then
+            call calculate_gap_2b(neighbors, n_gap_2b, gap_2b_hypers, do_, &
+                                  species_info, state%species, split, gap_2b, this_gap_2b, &
+                                  time%gap_2b)
+         end if
+
 #ifdef _DEBUG
          if (rank == 0) then
             call print_debug("Finished gap_2b", "turbogap_main.f90")
@@ -751,6 +747,11 @@ contains
          !*************************************************************************
                                                                        !! gap_3b
 
+         if (perform%gap_3b) then
+            call calculate_gap_3b(neighbors, n_gap_3b, gap_3b_hypers, do_, &
+                                  species_info, state%species, split, gap_3b, this_gap_3b, time%gap_3b)
+         end if
+
 #ifdef _DEBUG
          if (rank == 0) then
             call print_debug("Finished gap_3b", "turbogap_main.f90")
@@ -762,6 +763,12 @@ contains
 
          !*************************************************************************
                                                                      !! core_pot
+
+         if (perform%gap_core_pot) then
+            call calculate_gap_core_pot(neighbors, n_gap_core_pot, &
+                                        gap_core_pot_hypers, do_, species_info, state%species, split, &
+                                        gap_core_pot, this_gap_core_pot, time%gap_core_pot)
+         end if
 
 #ifdef _DEBUG
          if (rank == 0) then
@@ -842,13 +849,67 @@ contains
 #ifdef _MPIF90
          call time_start(time%mpi)
 
-         call collect_calculation(do_%forces, state%n_sites, gap_soap, this_gap_soap, energy%gap_soap)
+         call collect_calculation(do_%forces, state%n_sites, gap_soap, this_gap_soap, state%energies%gap_soap)
 
-         total = gap_soap
+         call collect_calculation(do_%forces, state%n_sites, gap_2b, this_gap_2b, state%energies%gap_2b)
 
-         state%energy = energy%gap_soap
+         call collect_calculation(do_%forces, state%n_sites, gap_3b, this_gap_3b, state%energies%gap_3b)
+
+         call collect_calculation(do_%forces, state%n_sites, gap_core_pot, this_gap_core_pot, state%energies%gap_core_pot)
 
          call time_end(time%mpi)
+
+         if (perform%gap_soap) then
+            total%energies = total%energies + gap_soap%energies
+         end if
+
+         if (perform%gap_2b) then
+            total%energies = total%energies + gap_2b%energies
+         end if
+
+         if (perform%gap_3b) then
+            total%energies = total%energies + gap_3b%energies
+         end if
+
+         if (perform%gap_core_pot) then
+            total%energies = total%energies + gap_core_pot%energies
+         end if
+
+         state%energy = sum(total%energies)
+         state%energies%total = state%energy
+
+         if (do_%forces) then
+
+            if (perform%gap_soap) then
+               total%forces = total%forces + gap_soap%forces
+               total%virial = total%virial + gap_soap%virial
+            end if
+
+            if (perform%gap_2b) then
+               total%forces = total%forces + gap_2b%forces
+               total%virial = total%virial + gap_2b%virial
+            end if
+
+            if (perform%gap_3b) then
+               total%forces = total%forces + gap_3b%forces
+               total%virial = total%virial + gap_3b%virial
+            end if
+
+            if (perform%gap_core_pot) then
+               total%forces = total%forces + gap_core_pot%forces
+               total%virial = total%virial + gap_core_pot%virial
+            end if
+
+            ! if (rank == 0) then
+            !    call print_message("virial")
+            !    call print_matrix_dp(total%virial)
+
+            !    call print_message("forces")
+            !    call print_matrix_dp(total%forces)
+            ! end if
+
+         end if
+
 #endif
 
 #ifdef _DEBUG
@@ -861,48 +922,54 @@ contains
          !*************************************************************************
 
          !*************************************************************************
+                                                   !! Writing to XYZ for prediction
+
+         if (do_%only_prediction) then
+            if (rank == 0) then
+               call time_start(time%writing)
+
+               call wrap_pbc(state)
+               call write_extxyz(file_trajectory, do_, state, md, total, &
+                                 local_property_labels, local_properties, &
+                                 energies_string)
+
+               call time_end(time%writing)
+               call print_message("Prediction Energies")
+               call print_energies(energy, do_)
+            end if
+         end if
+
+                                       !! Ginished Writing to XYZ for prediction
+         !*************************************************************************
+
+         !*************************************************************************
                                                                 !! Doing md step
 
          if (perform%md_step) then
-            call time_start(time%md)
 
-            call calculate_md_step(do_, perform, md, state, total, thermo, &
-                                   file_thermo, format_thermo, file_trajectory, local_property_labels, local_properties, &
-                                   neighbors%buffer, energy%exp, energies_string, &
-                                   converged_md, time%writing, time%mpi, rank)
-            call print_message("Completed MD step ")
-            call print_parameter("Step  #", md%i_step)
-            call print_parameter("n_steps", md%n_steps)
-            call print_parameter("converged", converged_md)
+            if (rank == 0) then
+               call time_start(time%md)
 
-            call time_end(time%md)
+               call wrap_pbc_cell(state)
 
-            if (converged_md) then
-               if (.not. do_%hybrid_mc) then
-                  exit_loop = .true.
-               end if
+               call calculate_md_step(do_, perform, md, state, total, thermo, &
+                                      file_thermo, format_thermo, file_trajectory, &
+                                      local_property_labels, local_properties, &
+                                      neighbors%buffer, energy%exp, energies_string, &
+                                      converged_md, time%writing, time%mpi, rank, exit_loop)
+
+               energy%kinetic = state%E_kinetic
+               call print_energies(energy, do_)
+
+               call time_end(time%md)
+
             end if
 
-         end if
+            call broadcast_md(exit_loop, do_%rebuild_neighbors_list, state, time%mpi)
 
-         if (md%n_steps == md%i_step .and. .not. do_%mc) &
-            exit_loop = .true.
+            if (exit_loop) &
+               exit main_loop
 
-#ifdef _MPIF90
-         call mpi_bcast(exit_loop, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-#endif
-         if (exit_loop) &
-            exit main_loop
-
-         if (perform%write_xyz .or. .true.) then
-            call time_start(time%writing)
-
-            call wrap_pbc(state)
-            call write_extxyz(file_trajectory, do_, state, md, total, &
-                              local_property_labels, local_properties, &
-                              energies_string)
-
-            call time_end(time%writing)
          end if
 
 #ifdef _DEBUG
@@ -916,7 +983,28 @@ contains
 
          !*************************************************************************
                                                                 !! Doing mc step
-         !
+
+         if (perform%mc_step) then
+
+            if (rank == 0) then
+
+               call calculate_mc_step(state, &
+                                      local_property_labels, &
+                                      species_info, thermo, &
+                                      mc, md, &
+                                      perform, do_, &
+                                      total, &
+                                      file_mc, &
+                                      file_mc_log, format_mc_log, &
+                                      time%mc, time%writing)
+            end if
+
+            ! Broadcast mc step
+            !
+            call broadcast_mc(state, do_, rank, md, mc%move, time%mpi)
+
+         end if
+
 #ifdef _DEBUG
          if (rank == 0) then
             call print_debug("Finished doing mc step", "turbogap_main.f90")

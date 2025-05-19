@@ -31,10 +31,12 @@ module md_interface
    use md_types, only: md_t
    use types, only: state_t, thermo_t, calculation_t
    use printing, only: print_error, print_message, print_warning, &
-                       print_parameter, print_parameter
+                       print_parameter, print_parameter, print_small_message
 
-   use md_utils, only: remove_cm_vel, wrap_pbc_supercell, velocity_verlet, &
-                       gradient_descent, gradient_descent_box, box_scaling, berendsen_barostat, berendsen_thermostat
+   use md_utils, only: remove_cm_vel, wrap_pbc, wrap_pbc_cell, wrap_pbc_supercell, velocity_verlet, &
+                       gradient_descent, gradient_descent_box, box_scaling, &
+                       berendsen_barostat, berendsen_thermostat, &
+                       gradient_descent_positions_and_lattice !, gradient_descent_variable_cell_sqnm
 
    use write_xyz, only: write_extxyz
 
@@ -124,6 +126,84 @@ contains
                           + (virial(1, 1) + virial(2, 2) + virial(3, 3))/3.0_dp)/volume*eVperA3tobar
    end function get_instant_pressure
 
+   subroutine get_formatted_file_strings(n_quantities, write_quantities, quantities,&
+        & format_quantities, format_length, string, format_string)
+      integer, intent(in)        :: n_quantities
+      logical, intent(in)                    :: write_quantities(n_quantities)
+
+      character(len=*), intent(in)        :: quantities(n_quantities)
+
+      character(len=*), intent(in)      :: format_quantities(n_quantities)
+      integer                    :: format_length(n_quantities)
+
+      character*20               :: temp_string
+      character*20               :: temp_string2
+      character*1024, intent(out)     :: string
+      character*1024, intent(out) :: format_string
+
+      integer :: i
+      integer :: n_write
+      integer :: count
+      integer :: n_start
+      integer :: n_end
+      integer :: n_str
+
+      format_string = "("
+      string = "#"
+
+      count = 0
+      n_write = 0
+      do i = 1, n_quantities
+         if (write_quantities(i)) then
+            n_write = n_write + 1
+         end if
+      end do
+
+      do i = 1, n_quantities
+         if (write_quantities(i)) then
+            count = count + 1
+            ! Write the format for the string which should be the length of the
+            ! format specifier for the quantity
+            if (count == 1) &
+               format_length(i) = format_length(i) - 1
+
+            if (format_length(i) - 1 < 10) then
+               write (temp_string, '(A7,I1,A1)') '(A,1X,A', format_length(i), ')'
+            else
+               write (temp_string, '(A7,I2,A1)') '(A,1X,A', format_length(i), ')'
+            end if
+
+            n_start = len(quantities(i)) - format_length(i) + 1
+            n_end = len(quantities(i))
+
+            write (string, trim(temp_string)) trim(adjustl(string)), &
+               quantities(i) (n_start:n_end)
+
+            n_start = len(format_quantities(i)) - len_trim(format_quantities(i)) + 1
+            n_end = len(format_quantities(i))
+
+            n_str = len_trim(adjustl(format_string)) + (n_end - n_start + 1) + 3
+
+            if (n_str < 10) then
+               write (temp_string, '(A7,I1,A3)') '(A', n_str, 'A1)'
+            else if (n_str < 100) then
+               write (temp_string, '(A7,I2,A3)') '(A', n_str, 'A1)'
+            else
+               ! if n_str > 1000
+               write (temp_string, '(A7,I3,A3)') '(A', n_str, 'A1)'
+            end if
+
+            if (count == n_write) then
+               write (format_string, temp_string) trim(adjustl(format_string))//'1X,'// &
+                  format_quantities(i) (n_start:n_end), ')'
+            else
+               write (format_string, temp_string) trim(adjustl(format_string))//'1X,'// &
+                  format_quantities(i) (n_start:n_end), ','
+            end if
+         end if
+      end do
+   end subroutine get_formatted_file_strings
+
    subroutine initialize_thermo_file(file_thermo, do_, format_string)
       integer, intent(in) :: file_thermo
       type(control_t), intent(in) :: do_
@@ -154,11 +234,6 @@ contains
       write_quantities(4) = .true. ! E_kinetic
       write_quantities(5) = .true. ! E_pot
       write_quantities(6) = .true. ! Pressure
-      if (do_%exp) then
-         write_quantities(7) = .true. ! E_exp
-      else
-         write_quantities(7) = .false. ! E_exp
-      end if
       write_quantities(7) = .true. ! E_exp
       if (do_%write_lv) then
          write_quantities(8) = .true.
@@ -170,88 +245,91 @@ contains
       format_quantities(1) = "                 I10"
       format_length(1) = 10
 
-      quantities(2) = "                Time"
+      quantities(2) = "           Time [fs]"
       format_quantities(2) = "               F16.4"
       format_length(2) = 16
 
-      quantities(3) = "         Temperature"
+      quantities(3) = "     Temperature [K]"
       format_quantities(3) = "               F16.4"
       format_length(3) = 16
 
-      quantities(4) = "           E_kinetic"
+      quantities(4) = "      E_kinetic [eV]"
       format_quantities(4) = "               F20.8"
       format_length(4) = 20
 
-      quantities(5) = "         E_potential"
+      quantities(5) = "    E_potential [eV]"
       format_quantities(5) = "               F20.8"
       format_length(5) = 20
 
-      quantities(6) = "      E_experimental"
+      quantities(6) = " E_experimental [eV]"
       format_quantities(6) = "               F20.8"
       format_length(6) = 20
 
-      quantities(7) = "            Pressure"
+      quantities(7) = "      Pressure [bar]"
       format_quantities(7) = "               F20.8"
       format_length(7) = 20
 
-      quantities(8) = "     Lattice_Vectors"
-      format_quantities(7) = "              9F20.8"
-      format_length(7) = 20
+      quantities(8) = " Lattice_Vectors [A]"
+      format_quantities(8) = "              9F20.8"
+      format_length(8) = 20
 
-      format_string = "("
-      string = "#"
+      call get_formatted_file_strings(n_quantities, write_quantities,&
+        & quantities, format_quantities, format_length, string, format_string)
 
-      count = 0
-      n_write = 0
-      do i = 1, n_quantities
-         if (write_quantities(i)) then
-            n_write = n_write + 1
-         end if
-      end do
+      ! format_string = "("
+      ! string = "#"
 
-      do i = 1, n_quantities
-         if (write_quantities(i)) then
-            count = count + 1
-            ! Write the format for the string which should be the length of the
-            ! format specifier for the quantity
-            if (count == 1) &
-               format_length(i) = format_length(i) - 1
+      ! count = 0
+      ! n_write = 0
+      ! do i = 1, n_quantities
+      !    if (write_quantities(i)) then
+      !       n_write = n_write + 1
+      !    end if
+      ! end do
 
-            if (format_length(i) - 1 < 10) then
-               write (temp_string, '(A7,I1,A1)') '(A,1X,A', format_length(i) - 1, ')'
-            else
-               write (temp_string, '(A7,I2,A1)') '(A,1X,A', format_length(i) - 1, ')'
-            end if
+      ! do i = 1, n_quantities
+      !    if (write_quantities(i)) then
+      !       count = count + 1
+      !       ! Write the format for the string which should be the length of the
+      !       ! format specifier for the quantity
+      !       if (count == 1) &
+      !          format_length(i) = format_length(i) - 1
 
-            n_start = len(quantities(i)) - format_length(i) + 3
-            n_end = len(quantities(i))
+      !       if (format_length(i) - 1 < 10) then
+      !          write (temp_string, '(A7,I1,A1)') '(A,1X,A', format_length(i) - 1, ')'
+      !       else
+      !          write (temp_string, '(A7,I2,A1)') '(A,1X,A', format_length(i) - 1, ')'
+      !       end if
 
-            write (string, trim(temp_string)) trim(adjustl(string)), &
-               quantities(i) (n_start:n_end)
+      !       n_start = len(quantities(i)) - format_length(i) + 3
+      !       n_end = len(quantities(i))
 
-            n_start = len(format_quantities(i)) - len_trim(format_quantities(i)) + 1
-            n_end = len(format_quantities(i))
+      !       write (string, trim(temp_string)) trim(adjustl(string)), &
+      !          quantities(i) (n_start:n_end)
 
-            n_str = len_trim(adjustl(format_string)) + (n_end - n_start + 1)
+      !       n_start = len(format_quantities(i)) - len_trim(format_quantities(i)) + 1
+      !       n_end = len(format_quantities(i))
 
-            if (n_str < 10) then
-               write (temp_string, '(A7,I1,A3)') '(A', n_str, 'A1)'
-            else if (n_str < 100) then
-               write (temp_string, '(A7,I2,A3)') '(A', n_str, 'A1)'
-            else
-               ! if n_str > 1000
-               write (temp_string, '(A7,I3,A3)') '(A', n_str, 'A1)'
-            end if
+      !       n_str = len_trim(adjustl(format_string)) + (n_end - n_start + 1)
 
-            if (count == n_write) then
-               write (format_string, temp_string) trim(adjustl(format_string))// &
-                  format_quantities(i) (n_start:n_end), ')'
-            else
-               write (format_string, temp_string) trim(adjustl(format_string))// &
-                  format_quantities(i) (n_start:n_end), ','
-            end if
-         end if
-      end do
+      !       if (n_str < 10) then
+      !          write (temp_string, '(A7,I1,A3)') '(A', n_str, 'A1)'
+      !       else if (n_str < 100) then
+      !          write (temp_string, '(A7,I2,A3)') '(A', n_str, 'A1)'
+      !       else
+      !          ! if n_str > 1000
+      !          write (temp_string, '(A7,I3,A3)') '(A', n_str, 'A1)'
+      !       end if
+
+      !       if (count == n_write) then
+      !          write (format_string, temp_string) trim(adjustl(format_string))// &
+      !             format_quantities(i) (n_start:n_end), ')'
+      !       else
+      !          write (format_string, temp_string) trim(adjustl(format_string))// &
+      !             format_quantities(i) (n_start:n_end), ','
+      !       end if
+      !    end if
+      ! end do
 
       write (file_thermo, '(A)') trim(string)
 
@@ -279,7 +357,7 @@ contains
       else
 
          write (file_thermo, trim(format_string)) step, time, temperature, &
-            e_kinetic, e_pot, pressure, e_exp, &
+            e_kinetic, e_pot, e_exp, pressure, &
             a_box(1), a_box(2), a_box(3), &
             b_box(1), b_box(2), b_box(3), &
             c_box(1), c_box(2), c_box(3)
@@ -535,7 +613,7 @@ contains
    subroutine calculate_md_step(do_, perform, md, state, total, thermo, &
                                 file_thermo, format_thermo, file_trajectory, local_property_labels, local_properties, &
                                 neighbors_buffer, energy_exp, energies_string, &
-                                converged, time_writing, time_mpi, rank)
+                                converged, time_writing, time_mpi, rank, exit_loop)
       type(control_t), intent(inout) :: do_
       type(perform_t), intent(in) :: perform
       type(state_t), intent(inout) :: state
@@ -555,6 +633,7 @@ contains
       real(dp), intent(inout) :: time_mpi(3)
 
       integer, intent(in) :: rank
+      logical, intent(inout) :: exit_loop
 
       real(dp) :: lv(3, 3)
       real(dp) :: instant_pressure_tensor(3, 3)
@@ -562,6 +641,10 @@ contains
 
       real(dp), parameter :: kB = 8.6173303d-5
       real(dp), parameter :: eVperA3tobar = 1602176.6208_dp
+
+      real(dp) :: max_diff
+      real(dp) :: temp_max_diff
+      integer :: max_diff_idx
 
       logical :: converged_relaxation
       logical :: converged_box_relaxation
@@ -599,7 +682,8 @@ contains
       !     We wrap the positions and remoce CM velocity
 
                                  !! Wrapping positions around the supercell here
-      call wrap_pbc_supercell(state)
+      !call wrap_pbc_supercell(state)
+      ! call wrap_pbc_supercell(state)
       call remove_cm_vel(state%velocities, state%masses)
 
       ! FIXME: Implement adaptive timestep stuff!
@@ -656,6 +740,53 @@ contains
             state%fix_atom, &
             state%energy)
 
+      else if (md%optimize == "gd-variable-cell") then
+
+         call print_parameter("gd_i_step", md%gd_i_step)
+         md%first_step = md%i_step == 0
+         ! call gradient_descent_variable_cell_sqnm(md%vc_optimizer, &
+         !                                          state%energy, &
+         !                                          state%n_sites, &
+         !                                          md%gd_variable_cell_w, &
+         !                                          state%positions, &
+         !                                          total%forces, &
+         !                                          total%virial/state%volume, &
+         !                                          state%masses, &
+         !                                          state%velocities, &
+         !                                          state%fix_atom, &
+         !                                          state%a_box, &
+         !                                          state%b_box, &
+         !                                          state%c_box, &
+         !                                          state%indices, &
+         !                                          md%first_step, &
+         !                                          md%max_opt_step, &
+         !                                          md%i_step, &
+         !                                          md%n_steps, &
+         !                                          md%lat_tol, &
+         !                                          md%f_tol, &
+         !                                          converged_box_relaxation)
+
+         call gradient_descent_positions_and_lattice(state%energy, &
+                                                     state%n_sites, &
+                                                     md%gd_variable_cell_w, &
+                                                     state%positions, &
+                                                     total%forces, &
+                                                     total%virial/state%volume, &
+                                                     state%masses, &
+                                                     state%velocities, &
+                                                     state%fix_atom, &
+                                                     state%a_box, &
+                                                     state%b_box, &
+                                                     state%c_box, &
+                                                     state%indices, &
+                                                     md%first_step, &
+                                                     md%max_opt_step, &
+                                                     md%i_step, &
+                                                     md%n_steps, &
+                                                     md%lat_tol, &
+                                                     md%f_tol, &
+                                                     converged_box_relaxation)
+
       else if ((md%optimize == "gd-box" .or. md%optimize == "gd-box-ortho") .and. md%gd_box_do_pos) then
 
          !       We propagate the state%positions
@@ -674,7 +805,9 @@ contains
             state%fix_atom, &
             state%energy)
 
-       if (md%gd_i_step > 1 .and. abs(state%energy - md%energy_prev) < md%e_tol*dfloat(state%n_sites) .and. maxval(total%forces) < &
+         if (md%gd_i_step > 1 &
+             .and. abs(state%energy - md%energy_prev) < md%e_tol*dfloat(state%n_sites) &
+             .and. maxval(total%forces) < &
              md%f_tol) then
             !         If the position optimization is converged
             !         (energy only) we set the code to do the
@@ -766,7 +899,8 @@ contains
       if (perform%write_xyz) then
          call time_start(time_writing)
 
-         call wrap_pbc_supercell(state)
+         call wrap_pbc(state)
+         ! state%positions_wrapped(1:3, 1:state%n_sites) = state%positions(1:3, 1:state%n_sites)
 
          ! call get_xyz_energy_string(energies_soap, energies_2b, &
          !                            energies_3b, energies_core_pot, energies_vdw, energies_exp, &
@@ -797,13 +931,13 @@ contains
       !***************************************************************************
                                                  !! Barostatting / box rescaling
 
-      if (perform%scale_box) then
+      if (do_%scale_box) then
        !! Just scale the box
          call box_scaling(state%positions(1:3, 1:state%n_sites), &
                           state%a_box, state%b_box, state%c_box, &
                           state%indices, md%i_step, md%n_steps, md%box_scaling_factor)
 
-      else if (perform%barostat_berendsen) then
+      else if (md%barostat == "berendsen") then
 
          lv(1:3, 1) = state%a_box(1:3)
          lv(1:3, 2) = state%b_box(1:3)
@@ -811,6 +945,10 @@ contains
          call berendsen_barostat(lv(1:3, 1:3), &
                                  get_target_state_variable(md%i_step, md%n_steps, thermo%p_beg, thermo%p_end), &
                                  instant_pressure_tensor, md%barostat_sym, md%tau_p, md%gamma_p, md%time_step)
+
+         call print_parameter("target pressure", &
+                              get_target_state_variable(md%i_step, md%n_steps, thermo%p_beg, thermo%p_end))
+
          state%a_box(1:3) = lv(1:3, 1)
          state%b_box(1:3) = lv(1:3, 2)
          state%c_box(1:3) = lv(1:3, 3)
@@ -818,9 +956,8 @@ contains
                                  get_target_state_variable(md%i_step, md%n_steps, thermo%p_beg, thermo%p_end), &
                                  instant_pressure_tensor, md%barostat_sym, md%tau_p, md%gamma_p, md%time_step)
 
-      else if ((perform%gradient_descent_box .or. perform%gradient_descent_box_ortho) &
+      else if ((md%optimize == "gd-box" .or. md%optimize == "gd-box-ortho") &
                .and. .not. md%gd_box_do_pos) then
-
          ! Reusing the converged_box_relaxation variable
          converged_box_relaxation = check_converged_box_relaxation_or_restart(do_, md, state&
               &%n_sites, state%energy, md%energy_prev, state%instant_pressure,&
@@ -926,8 +1063,31 @@ contains
                              - md%positions_prev(1:3, 1:state%n_sites))
 
       do_%rebuild_neighbors_list = .false.
-      if (any(state%indices > 1)) &
+      if (any(state%indices > 1) .or. md%optimize == 'gd-variable-cell') &
          do_%rebuild_neighbors_list = .true.
+
+      max_diff = 0.0_dp
+      temp_max_diff = 0.0_dp
+      max_diff_idx = 0
+
+      do i = 1, state%n_sites
+
+         temp_max_diff = dsqrt((state%positions(1, i) - md%positions_prev(1, i))**2 &
+                               + (state%positions(2, i) - md%positions_prev(2, i))**2 &
+                               + (state%positions(3, i) - md%positions_prev(3, i))**2)
+
+         ! temp_max_diff = dsqrt(md%positions_diff(1, i)**2 &
+         !                       + md%positions_diff(2, i)**2 &
+         !                       + md%positions_diff(3, i)**2)
+         if (temp_max_diff > max_diff) then
+            max_diff = temp_max_diff
+            max_diff_idx = i
+         end if
+
+      end do
+
+      call print_parameter("max iter norm pos", max_diff)
+      call print_parameter("max iter pos idx", max_diff_idx)
 
       do i = 1, state%n_sites
          if ( &
@@ -950,20 +1110,24 @@ contains
       md%energy_prev = state%energy
       md%instant_pressure_prev = state%instant_pressure
 
-#ifdef _MPIF90
-      call mpi_bcast(do_%rebuild_neighbors_list, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-#endif
+      md%positions_prev(1:3, 1:state%n_sites) = state%positions(1:3, 1:state%n_sites)
 
-      !   Make sure all ranks have correct state%positions and state%velocities
+      ! Exit conditions
 
-#ifdef _MPIF90
-      call time_start(time_mpi)
+      if (converged_md) then
+         if (.not. do_%hybrid_mc) then
+            exit_loop = .true.
+         end if
+      end if
 
-      call mpi_bcast(state%positions, 3*state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-      call mpi_bcast(state%velocities, 3*state%n_sites, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      if (md%n_steps == md%i_step .and. .not. do_%mc) &
+         exit_loop = .true.
 
-      call time_end(time_mpi)
-#endif
+      call print_small_message("MD step")
+      call print_parameter("Step  #", md%i_step)
+      call print_parameter("n_steps", md%n_steps)
+      call print_parameter("converged", converged_md)
+      call print_parameter("MD Energies", converged_md)
    end subroutine calculate_md_step
 
    subroutine set_supercell_positions(n_sites, positions, a_box, b_box, c_box, indices)

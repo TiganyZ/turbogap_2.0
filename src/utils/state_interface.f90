@@ -35,8 +35,9 @@ module state_interface
 
 contains
 
-   subroutine reallocate_state(state, need_velocities, n_sites, n_sites_supercell)
+   subroutine reallocate_state(state, n_local_properties, need_velocities, n_sites, n_sites_supercell)
       type(state_t), intent(inout)   :: state
+      integer, intent(in) :: n_local_properties
       logical, intent(in) :: need_velocities
       integer, intent(in) :: n_sites
       integer, intent(in), optional :: n_sites_supercell
@@ -46,11 +47,13 @@ contains
       if (allocated(state%species)) deallocate (state%species)
       if (allocated(state%xyz_species)) deallocate (state%xyz_species)
       if (allocated(state%fix_atom)) deallocate (state%fix_atom)
+      if (allocated(state%local_properties)) deallocate (state%local_properties)
 
       allocate (state%positions(1:3, 1:state%n_sites))
       allocate (state%species(1:state%n_sites))
       allocate (state%xyz_species(1:state%n_sites))
       allocate (state%fix_atom(1:3, 1:state%n_sites))
+      allocate (state%local_properties(1:state%n_sites, n_local_properties))
 
       if (need_velocities) then
          if (allocated(state%velocities)) deallocate (state%velocities)

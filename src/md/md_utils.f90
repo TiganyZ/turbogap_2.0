@@ -31,6 +31,10 @@ module md_utils
    use types, only: state_t, calculation_t
    use functions, only: cross_product
    use neighbors_interface, only: get_distance, get_fractional_coordinates
+   use printing, only: print_parameters, print_parameter, print_matrix_dp, print_message
+
+   !use periodic_optimizer, only: optimizer_periodic
+
    implicit none
 
 contains
@@ -40,6 +44,379 @@ contains
       state%volume = dot_product(cross_product(state%a_box, state%b_box), state%c_box) &
                      /(dfloat(state%indices(1)*state%indices(2)*state%indices(3)))
    end subroutine get_volume
+
+   pure function invert_3x3(mat) result(mat_inv)
+      real(dp), intent(in) :: mat(3, 3)
+      real(dp) :: mat_inv(3, 3)
+      real(dp) :: md
+
+      md = -mat(1,3)*mat(3,1)*mat(2,2) + mat(2,1)*mat(1,3)*mat(3,2) + mat(1,2)*mat(3,1)*mat(2,3) - mat(1,1)*mat(2,3)*mat(3,2) &
+           - mat(1, 2)*mat(2, 1)*mat(3, 3) + mat(1, 1)*mat(2, 2)*mat(3, 3)
+      mat_inv(1, 1) = mat(2, 2)*mat(3, 3) - mat(2, 3)*mat(3, 2)
+      mat_inv(1, 2) = mat(1, 3)*mat(3, 2) - mat(1, 2)*mat(3, 3)
+      mat_inv(1, 3) = mat(1, 2)*mat(2, 3) - mat(1, 3)*mat(2, 2)
+      mat_inv(2, 1) = mat(2, 3)*mat(3, 1) - mat(2, 1)*mat(3, 3)
+      mat_inv(2, 2) = mat(1, 1)*mat(3, 3) - mat(1, 3)*mat(3, 1)
+      mat_inv(2, 3) = mat(1, 3)*mat(2, 1) - mat(1, 1)*mat(2, 3)
+      mat_inv(3, 1) = mat(2, 1)*mat(3, 2) - mat(2, 2)*mat(3, 1)
+      mat_inv(3, 2) = mat(1, 2)*mat(3, 1) - mat(1, 1)*mat(3, 2)
+      mat_inv(3, 3) = mat(1, 1)*mat(2, 2) - mat(1, 2)*mat(2, 1)
+      mat_inv = mat_inv/md
+   end function invert_3x3
+
+   pure function determinant_3x3(mat) result(det)
+      real(dp), intent(in) :: mat(3, 3)
+      real(dp) :: det
+
+      det = ( &
+            mat(1, 1)*(mat(2, 2)*mat(3, 3) - mat(3, 2)*mat(2, 3)) &
+            - mat(1, 2)*(mat(2, 1)*mat(3, 3) - mat(3, 1)*mat(2, 3)) &
+            + mat(1, 3)*(mat(2, 1)*mat(3, 2) - mat(3, 1)*mat(2, 2)) &
+            )
+   end function determinant_3x3
+
+   pure function converged_gd_box_variable_cell(n_steps, max_steps, dE_dA_tilde, lat_tol, forces, f_tol) result(converged)
+      integer, intent(in) :: n_steps
+      integer, intent(in) :: max_steps
+      real(dp), intent(in) :: dE_dA_tilde(3, 3)
+      real(dp), intent(in) :: lat_tol
+      real(dp), intent(in) :: forces(:, :)
+      real(dp), intent(in) :: f_tol
+      real(dp) :: max_dE_dA
+      real(dp) :: max_dE_dA_neg
+      logical :: converged
+
+      max_dE_dA = maxval(dE_dA_tilde)
+      max_dE_dA_neg = maxval(-dE_dA_tilde)
+      max_dE_dA = max(abs(max_dE_dA), abs(max_dE_dA_neg))
+
+      converged = ((max_dE_dA < lat_tol .and. maxval(forces) < f_tol) &
+                   .or. n_steps >= max_steps &
+                   )
+
+   end function converged_gd_box_variable_cell
+
+   ! subroutine gradient_descent_variable_cell_sqnm(optimizer, energy, n_sites, w, positions, forces, stress, masses, velocities, fix_atom, &
+   !                                                a_box, b_box, c_box, indices, &
+   !                                                first_step, max_opt_step, n_steps, max_steps, lat_tol, f_tol, converged)
+   !    type(optimizer_periodic), intent(inout) :: optimizer
+
+   !    real(dp), intent(in) :: energy
+   !    integer, intent(in)     :: n_sites
+   !    real(dp), intent(in)    :: w
+   !    real(dp), intent(inout) :: positions(:, :)
+   !    real(dp), intent(inout) :: velocities(:, :)
+   !    real(dp), intent(in)    :: forces(:, :)
+   !    real(dp), intent(in)    :: stress(:, :)
+   !    real(dp), intent(in)    :: masses(:)
+   !    logical, intent(in) :: fix_atom(:, :)
+
+   !    logical, intent(inout)     :: first_step
+   !    real(dp), intent(in)    :: max_opt_step
+
+   !    integer, intent(in) :: n_steps
+   !    integer, intent(in) :: max_steps
+   !    real(dp), intent(in) :: lat_tol
+   !    real(dp), intent(in) :: f_tol
+
+   !    real(dp), allocatable, save :: scaled_positions(:, :)
+   !    real(dp), allocatable, save :: scaled_forces(:, :)
+   !    real(dp), allocatable, save :: scaled_positions_prev(:, :)
+   !    real(dp), allocatable, save :: scaled_forces_prev(:, :)
+
+   !    real(dp), intent(inout) :: a_box(3)
+   !    real(dp), intent(inout) :: b_box(3)
+   !    real(dp), intent(inout) :: c_box(3)
+   !    integer, intent(inout) :: indices(3)
+
+   !    real(dp), save    :: a_box_0(3)
+   !    real(dp), save    :: b_box_0(3)
+   !    real(dp), save    :: c_box_0(3)
+   !    integer, save :: indices_0(3)
+
+   !    ! Internal variables
+
+   !    real(dp) :: A_lat(3, 3)
+   !    real(dp) :: A_lat_inv(3, 3)
+   !    real(dp) :: A_tilde(3, 3)
+   !    real(dp) :: transform_forces(3, 3)
+   !    real(dp) :: transform_positions(3, 3)
+   !    real(dp) :: transform_lattice(3, 3)
+   !    real(dp) :: transform_lattice_der(3, 3)
+   !    real(dp), save :: A_0(3, 3)
+   !    real(dp), save :: A_0_inv(3, 3)
+   !    real(dp), save :: diag_lengths_inv_0(3, 3)
+   !    real(dp), save :: diag_lengths_0(3, 3)
+   !    real(dp) :: dE_dA_lat(3, 3)
+   !    real(dp) :: gamma
+
+   !    real(dp) :: alpha = -.1
+   !    integer :: nhistx = 10
+   !    real(dp) :: lattice_weigth = 2.0_dp
+   !    real(dp) :: alpha0 = 1.d-2
+   !    real(dp) :: eps_subsp = 1.d-3
+
+   !    logical, intent(out) :: converged
+   !    integer :: i
+
+   !    call print_parameter("first_step", first_step)
+
+   !    if (first_step) then
+   !       a_box_0 = a_box
+   !       b_box_0 = b_box
+   !       c_box_0 = c_box
+   !       indices_0 = indices
+
+   !       A_0(1:3, 1) = a_box_0/dfloat(indices_0(1))
+   !       A_0(1:3, 2) = b_box_0/dfloat(indices_0(2))
+   !       A_0(1:3, 3) = c_box_0/dfloat(indices_0(3))
+
+   !       A_0_inv = invert_3x3(A_0)
+
+   !       diag_lengths_0 = 0.0_dp
+   !       diag_lengths_0(1, 1) = dsqrt(dot_product(A_0(1:3, 1), A_0(1:3, 1)))
+   !       diag_lengths_0(2, 2) = dsqrt(dot_product(A_0(1:3, 2), A_0(1:3, 2)))
+   !       diag_lengths_0(3, 3) = dsqrt(dot_product(A_0(1:3, 3), A_0(1:3, 3)))
+
+   !       diag_lengths_inv_0 = 0.0_dp
+   !       diag_lengths_inv_0(1, 1) = 1.0_dp/diag_lengths_0(1, 1)
+   !       diag_lengths_inv_0(2, 2) = 1.0_dp/diag_lengths_0(2, 2)
+   !       diag_lengths_inv_0(3, 3) = 1.0_dp/diag_lengths_0(3, 3)
+
+   !       if (allocated(scaled_positions)) then
+   !          deallocate (scaled_positions, scaled_positions_prev)
+   !          deallocate (scaled_forces, scaled_forces_prev)
+   !       end if
+
+   !       if (.not. allocated(scaled_positions)) then
+   !          allocate (scaled_positions_prev(3, n_sites + 3))
+   !          allocate (scaled_forces_prev(3, n_sites + 3))
+   !          allocate (scaled_positions(3, n_sites + 3))
+   !          allocate (scaled_forces(3, n_sites + 3))
+   !       end if
+
+   !    end if
+
+   !    transform_lattice = w*dsqrt(dfloat(n_sites))*diag_lengths_inv_0
+
+   !    transform_lattice_der = invert_3x3(transform_lattice)
+   !    call print_parameter("allocated scaled", allocated(scaled_positions))
+
+   !    A_lat(1:3, 1) = a_box/dfloat(indices(1))
+   !    A_lat(1:3, 2) = b_box/dfloat(indices(2))
+   !    A_lat(1:3, 3) = c_box/dfloat(indices(3))
+
+   !    A_lat_inv = invert_3x3(A_lat)
+
+   !    dE_dA_lat = -determinant_3x3(A_lat)*matmul(stress, transpose(A_lat_inv))
+
+   !    ! alpha = -.1
+   !    ! nhistx = 10
+   !    ! lattice_weigth = 2.d0
+   !    ! alpha0 = 1.d-2
+   !    ! eps_subsp = 1.d-3
+   !  !! initialize the periodic optimizer object.
+   !    if (first_step) then
+   !       call optimizer%initialize_optimizer(n_sites, A_lat, alpha, nhistx, lattice_weigth, alpha0, eps_subsp)
+   !    end if
+
+   !    call optimizer%optimizer_step(positions(1:3, 1:n_sites), A_lat, energy, forces, dE_dA_lat)
+
+   !    converged = converged_gd_box_variable_cell(n_steps, max_steps, dE_dA_lat, lat_tol, forces, f_tol)
+
+   !    if (converged) then
+   !       call optimizer%close_optimizer()
+   !    end if
+
+   ! end subroutine gradient_descent_variable_cell_sqnm
+
+   subroutine gradient_descent_positions_and_lattice(energy, n_sites, w, positions, forces, stress, masses, velocities, fix_atom, &
+                                                     a_box, b_box, c_box, indices, &
+                                                     first_step, max_opt_step, n_steps, max_steps, lat_tol, f_tol, converged)
+     !!> This is from Gubler 2023, Efficient variable cell shape geometry
+     !! optimization
+     !! The way it works is
+     !! 1. Define \tilde{E}(q_1, q_2,...,q_N, \tilde{A})
+     !!    > q_i = A_0 . A^-1_lat . x_i = A_0 . x_i_frac
+     !!    > \tilde{A} = w  \sqrt{n_sites} . A_lat . diag( 1/|a_box_0|,  1/|c_box_0|,  1/|c_box_0| )
+     !!    > dE/dq_i = A_lat A_0^-1 . dE/dx_i
+     !!    > d\tilde{E}/d\tilde{A} = dE/dA_lat . 1 / ( w . \sqrt{n_sites} ) . diag( |a_box_0|,  |c_box_0|, |c_box_0| )
+     !!    > dE/dA_lat = - det( A_lat ) . \sigma . transpose( A^-1_lat )
+     !! where
+     !! - \sigma is the stress tensor
+     !! - A_lat are the current lattice vectors
+     !! - A_0 are the original lattice vectors
+     !! - dE/dx_i is the negative of the force
+
+      real(dp), intent(in) :: energy
+      integer, intent(in)     :: n_sites
+      real(dp), intent(in)    :: w
+      real(dp), intent(inout) :: positions(:, :)
+      real(dp), intent(inout) :: velocities(:, :)
+      real(dp), intent(in)    :: forces(:, :)
+      real(dp), intent(in)    :: stress(:, :)
+      real(dp), intent(in)    :: masses(:)
+      logical, intent(in) :: fix_atom(:, :)
+
+      logical, intent(inout)     :: first_step
+      real(dp), intent(in)    :: max_opt_step
+
+      integer, intent(in) :: n_steps
+      integer, intent(in) :: max_steps
+      real(dp), intent(in) :: lat_tol
+      real(dp), intent(in) :: f_tol
+
+      real(dp), allocatable, save :: scaled_positions(:, :)
+      real(dp), allocatable, save :: scaled_forces(:, :)
+      real(dp), allocatable, save :: scaled_positions_prev(:, :)
+      real(dp), allocatable, save :: scaled_forces_prev(:, :)
+
+      real(dp), intent(inout) :: a_box(3)
+      real(dp), intent(inout) :: b_box(3)
+      real(dp), intent(inout) :: c_box(3)
+      integer, intent(inout) :: indices(3)
+
+      real(dp), save    :: a_box_0(3)
+      real(dp), save    :: b_box_0(3)
+      real(dp), save    :: c_box_0(3)
+      integer, save :: indices_0(3)
+
+      ! Internal variables
+
+      real(dp) :: A_lat(3, 3)
+      real(dp) :: A_lat_inv(3, 3)
+      real(dp) :: A_tilde(3, 3)
+      real(dp) :: transform_forces(3, 3)
+      real(dp) :: transform_positions(3, 3)
+      real(dp) :: transform_lattice(3, 3)
+      real(dp) :: transform_lattice_der(3, 3)
+      real(dp), save :: A_0(3, 3)
+      real(dp), save :: A_0_inv(3, 3)
+      real(dp), save :: diag_lengths_inv_0(3, 3)
+      real(dp), save :: diag_lengths_0(3, 3)
+      real(dp) :: dE_dA_lat(3, 3)
+      real(dp) :: gamma
+
+      logical, intent(out) :: converged
+      integer :: i
+
+      call print_parameter("first_step", first_step)
+
+      if (first_step) then
+         a_box_0 = a_box
+         b_box_0 = b_box
+         c_box_0 = c_box
+         indices_0 = indices
+
+         A_0(1:3, 1) = a_box_0/dfloat(indices_0(1))
+         A_0(1:3, 2) = b_box_0/dfloat(indices_0(2))
+         A_0(1:3, 3) = c_box_0/dfloat(indices_0(3))
+
+         A_0_inv = invert_3x3(A_0)
+
+         diag_lengths_0 = 0.0_dp
+         diag_lengths_0(1, 1) = dsqrt(dot_product(A_0(1:3, 1), A_0(1:3, 1)))
+         diag_lengths_0(2, 2) = dsqrt(dot_product(A_0(1:3, 2), A_0(1:3, 2)))
+         diag_lengths_0(3, 3) = dsqrt(dot_product(A_0(1:3, 3), A_0(1:3, 3)))
+
+         diag_lengths_inv_0 = 0.0_dp
+         diag_lengths_inv_0(1, 1) = 1.0_dp/diag_lengths_0(1, 1)
+         diag_lengths_inv_0(2, 2) = 1.0_dp/diag_lengths_0(2, 2)
+         diag_lengths_inv_0(3, 3) = 1.0_dp/diag_lengths_0(3, 3)
+
+         if (allocated(scaled_positions)) then
+            deallocate (scaled_positions, scaled_positions_prev)
+            deallocate (scaled_forces, scaled_forces_prev)
+         end if
+
+         if (.not. allocated(scaled_positions)) then
+            allocate (scaled_positions_prev(3, n_sites + 3))
+            allocate (scaled_forces_prev(3, n_sites + 3))
+            allocate (scaled_positions(3, n_sites + 3))
+            allocate (scaled_forces(3, n_sites + 3))
+         end if
+
+      end if
+
+      transform_lattice = w*dsqrt(dfloat(n_sites))*diag_lengths_inv_0
+
+      transform_lattice_der = invert_3x3(transform_lattice)
+      call print_parameter("allocated scaled", allocated(scaled_positions))
+
+      A_lat(1:3, 1) = a_box/dfloat(indices(1))
+      A_lat(1:3, 2) = b_box/dfloat(indices(2))
+      A_lat(1:3, 3) = c_box/dfloat(indices(3))
+
+      A_lat_inv = invert_3x3(A_lat)
+
+      dE_dA_lat = -determinant_3x3(A_lat)*matmul(stress, transpose(A_lat_inv))
+
+      gamma = 1.0_dp/(w*dsqrt(dfloat(n_sites)))
+
+      A_tilde = matmul(A_lat, transform_lattice) !1.0_dp/gamma*matmul(A_lat, diag_lengths_inv_0)
+
+      dE_dA_lat = matmul(dE_dA_lat, transform_lattice_der)
+
+      transform_positions = matmul(A_0, A_lat_inv)
+      transform_forces = matmul(A_lat, A_0_inv)
+
+      do i = 1, n_sites
+         scaled_positions(1:3, i) = matmul(transform_positions, positions(1:3, i))
+         scaled_forces(1:3, i) = matmul(transform_forces, forces(1:3, i))
+      end do
+
+      ! Add in the other variables for optimization
+      scaled_positions(1:3, n_sites + 1:n_sites + 3) = A_tilde(1:3, 1:3)
+      scaled_forces(1:3, n_sites + 1:n_sites + 3) = -dE_dA_lat
+
+      converged = converged_gd_box_variable_cell(n_steps, max_steps, dE_dA_lat, lat_tol, forces, f_tol)
+
+      call print_message("gd_variable_cell_positions step")
+      call print_parameter("max dE/dA_tilde ", maxval(dE_dA_lat))
+      call print_matrix_dp(dE_dA_lat)
+      call print_parameter("n_steps / ", n_steps)
+      call print_parameter("max_steps ", max_steps)
+      call print_parameter("max force ", maxval(forces))
+      call print_parameter("f_tol", f_tol)
+      call print_parameter("converged?", converged)
+
+      ! FIXME: Write gradient descent / Newton method for finding minimum
+
+      call gradient_descent_variable_cell(scaled_positions, &
+                                          scaled_positions_prev, &
+                                          velocities, &
+                                          scaled_forces, &
+                                          scaled_forces_prev, &
+                                          masses, &
+                                          max_opt_step, &
+                                          first_step, &
+                                          A_tilde(1:3, 1), A_tilde(1:3, 2), A_tilde(1:3, 3), &
+                                          fix_atom, &
+                                          energy)
+
+      scaled_positions_prev = scaled_positions
+      scaled_forces_prev = scaled_forces
+      first_step = .false.
+
+      ! ! Now transform back the positions and the lattice vector
+      A_tilde = scaled_positions(1:3, n_sites + 1:n_sites + 3)
+
+      A_lat = matmul(A_tilde, transform_lattice_der)
+
+      transform_positions = matmul(A_lat, diag_lengths_inv_0)
+      do i = 1, n_sites
+         ! Transform forces is the inverse transformation for the positions already
+         positions(1:3, i) = matmul(transform_positions, scaled_positions(1:3, i))
+      end do
+
+      a_box = A_lat(1:3, 1)*dfloat(indices(1))
+      b_box = A_lat(1:3, 2)*dfloat(indices(2))
+      c_box = A_lat(1:3, 3)*dfloat(indices(3))
+      call print_parameters("a_box", a_box)
+      call print_parameters("b_box", b_box)
+      call print_parameters("c_box", c_box)
+
+   end subroutine gradient_descent_positions_and_lattice
 
 !**************************************************************************
 ! Verlet is two subroutines
@@ -311,6 +688,28 @@ contains
       end do
    end subroutine wrap_pbc
 
+   subroutine wrap_pbc_cell(state)
+      type(state_t), intent(inout) :: state
+
+      real*8 :: dist(1:3), d
+      integer :: Np, i, i_shift(1:3)
+
+      Np = state%n_sites
+
+      do i = 1, Np
+         call get_distance([0.d0, 0.d0, 0.d0], state%positions(1:3, i), &
+                           state%a_box(1:3)/dfloat(state%indices(1)), &
+                           state%b_box(1:3)/dfloat(state%indices(2)), &
+                           state%c_box(1:3)/dfloat(state%indices(3)), &
+                           [.true., .true., .true.], dist, d, i_shift(1:3))
+
+         state%positions(1:3, i) = state%positions(1:3, i) &
+                                   - i_shift(1)*state%a_box(1:3)/dfloat(state%indices(1)) &
+                                   - i_shift(2)*state%b_box(1:3)/dfloat(state%indices(2)) &
+                                   - i_shift(3)*state%c_box(1:3)/dfloat(state%indices(3))
+      end do
+   end subroutine wrap_pbc_cell
+
    subroutine wrap_pbc_supercell(state)
       type(state_t), intent(inout) :: state
 
@@ -553,6 +952,107 @@ contains
       m_prev = sum(forces**2)
 
    end subroutine
+!**************************************************************************
+
+   subroutine gradient_descent_variable_cell(positions, positions_prev, velocities, &
+                                             forces, forces_prev, masses, max_opt_step, &
+                                             first_step, a_box, b_box, c_box, fix_atom, energy)
+
+      implicit none
+
+!   Input variables
+      real*8, intent(inout) :: positions(:, :), positions_prev(:, :), velocities(:, :), &
+                               forces_prev(:, :), forces(:, :)
+      real*8, intent(in) :: masses(:), a_box(1:3), b_box(1:3), &
+                            c_box(1:3), max_opt_step, energy
+      logical, intent(in) :: fix_atom(:, :), first_step
+!   Internal variables
+      real*8 :: gamma, max_force, this_force, pos(1:3), d
+      real*8, save :: gamma_prev, energy0, m_prev, gamma_back0
+      real*8, allocatable, save :: positions0(:, :), forces0(:, :)
+      integer :: n_sites, i, j, i_shift(1:3)
+      logical, save :: backtracking, initialized = .false.
+
+      n_sites = size(masses)
+
+!   Here we always set the velocities to zero
+      velocities = 0.d0
+
+      if (first_step) then
+         backtracking = .true.
+         if (.not. allocated(positions0)) allocate (positions0(1:3, 1:size(positions, 2)))
+         if (.not. allocated(forces0)) allocate (forces0(1:3, 1:size(positions, 2)))
+         positions0 = positions
+         forces0 = forces
+         energy0 = energy
+!     The first step is (over)estimated from user provided values
+         max_force = 0.d0
+         do i = 1, n_sites + 3
+            this_force = dsqrt(dot_product(forces(1:3, i), forces(1:3, i)))
+            if (this_force > max_force) then
+               max_force = this_force
+            end if
+         end do
+
+         if (max_force == 0.d0) then
+            gamma = 0.d0
+         else if (initialized) then
+            gamma = gamma_back0
+         else
+!        gamma = max(gamma0, max_opt_step/max_force)
+            gamma = max_opt_step/max_force
+         end if
+      else if (backtracking) then
+!     After the first step, we perform backtracking line search until fullfilling the
+!     Armijo-Goldstein condition
+         if (energy <= energy0 - gamma_prev*0.5d0*m_prev) then
+            backtracking = .false.
+            initialized = .true.
+            gamma_back0 = gamma_prev
+         else
+!       If the condition is not fulfilled, we restore the original positions and decrease
+!       the step by half
+            gamma = gamma_prev*0.5d0
+            positions = positions0
+            forces = forces0
+         end if
+      end if
+
+      if (.not. first_step .and. .not. backtracking) then
+!     Make sure we use the same image convention for positions and positions_prev
+         do i = 1, n_sites
+            call get_distance(positions_prev(1:3, i), positions(1:3, i), a_box, b_box, c_box, &
+                              [.true., .true., .true.], pos(1:3), d, i_shift(1:3))
+            positions_prev(1:3, i) = positions(1:3, i) - pos(1:3)
+         end do
+!     Barzilai–Borwein method for finding gamma
+         gamma = sum((positions - positions_prev)*(forces - forces_prev))/sum((forces - forces_prev)**2)
+         gamma = abs(gamma)
+      end if
+
+      positions_prev = positions
+      forces_prev = forces
+
+      do i = 1, n_sites
+         do j = 1, 3
+            if (.not. fix_atom(j, i)) then
+               positions(j, i) = positions_prev(j, i) + gamma*forces_prev(j, i)
+            end if
+         end do
+      end do
+
+      ! Add in the extra part which is for optimizing the lattice derivatives, which are stored at the end
+      do i = n_sites + 1, n_sites + 3
+         do j = 1, 3
+            positions(j, i) = positions_prev(j, i) + gamma*forces_prev(j, i)
+         end do
+      end do
+
+      gamma_prev = gamma
+      m_prev = sum(forces**2)
+
+   end subroutine gradient_descent_variable_cell
+
 !**************************************************************************
 
 !**************************************************************************

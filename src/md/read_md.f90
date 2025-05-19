@@ -177,6 +177,13 @@ contains
             call print_parameter("md_e_tol", md%e_tol, 'eV')
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
+      else if (keyword == 'lat_tol') then
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%lat_tol
+         if (rank == 0) &
+            call print_parameter("md_lat_tol", md%f_tol, 'A')
+         call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'f_tol') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, md%f_tol
@@ -191,6 +198,13 @@ contains
             call print_parameter("md_p_tol", md%p_tol, 'bar')
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
+      else if (keyword == 'gd_variable_cell_w') then
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, md%p_tol
+         if (rank == 0) &
+            call print_parameter("gd_variable_cell_w", md%gd_variable_cell_w)
+         call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == "optimize") then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, md%optimize
@@ -199,7 +213,7 @@ contains
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
          if (md%optimize == "vv" .or. md%optimize == "gd" .or. md%optimize == "gd-box" .or. &
-             md%optimize == "gd-box-ortho") then
+             md%optimize == "gd-box-ortho" .or. md%optimize == "gd-variable-cell") then
             continue
          else
             write (*, *) "ERROR: optimize algorithm not implemented:", md%optimize
@@ -301,6 +315,9 @@ contains
       type(species_info_t), intent(inout) :: species_info
       logical :: valid_choice
       integer :: i
+
+      if (do_%md) &
+         do_%need_velocities = .true.
 
 !   Get masses from database
       if ((do_%md .or. do_%mc) .and. .not. species_info%masses_in_input_file) then

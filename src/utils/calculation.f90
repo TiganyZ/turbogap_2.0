@@ -71,22 +71,22 @@ contains
 
       if (perform%gap_soap) then
          call reset_calculation(gap_soap, do_forces)
-         call reset_calculation(this_gap_soap, do_forces)
+         !call reset_calculation(this_gap_soap, do_forces)
       end if
 
       if (perform%gap_2b) then
          call reset_calculation(gap_2b, do_forces)
-         call reset_calculation(this_gap_2b, do_forces)
+         !call reset_calculation(this_gap_2b, do_forces)
       end if
 
       if (perform%gap_3b) then
          call reset_calculation(gap_3b, do_forces)
-         call reset_calculation(this_gap_3b, do_forces)
+         !call reset_calculation(this_gap_3b, do_forces)
       end if
 
       if (perform%gap_core_pot) then
          call reset_calculation(gap_core_pot, do_forces)
-         call reset_calculation(this_gap_core_pot, do_forces)
+         !call reset_calculation(this_gap_core_pot, do_forces)
       end if
 
                                               !! Reset Experimental Calculations

@@ -27,6 +27,7 @@
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 module md_types
    use kinds, only: dp
+   ! use periodic_optimizer, only: optimizer_periodic
    implicit none
 
    type md_t
@@ -63,9 +64,9 @@ module md_types
       real(dp) :: max_opt_step_eps = 0.05_dp
 
                                                !! time/pressure relaxation times
-      real(dp) :: tau_t = 10.0_dp
-      real(dp) :: tau_p = 10.0_dp
-      real(dp) :: tau_dt = 10.0_dp
+      real(dp) :: tau_t = 100.0_dp
+      real(dp) :: tau_p = 1000.0_dp
+      real(dp) :: tau_dt = 100.0_dp
 
       real(dp) :: instant_temp
 
@@ -97,6 +98,14 @@ module md_types
       real(dp), allocatable :: positions_diff(:, :)
       real(dp), allocatable :: positions_prev(:, :)
       real(dp), allocatable :: forces_prev(:, :)
+
+      ! type(optimizer_periodic) :: vc_optimizer
+      real(dp) :: gd_variable_cell_w = 1.0_dp
+      real(dp) :: lat_tol = 0.001_dp
+      real(dp), allocatable :: scaled_positions_prev(:, :)
+      real(dp), allocatable :: scaled_forces_prev(:, :)
+
+      logical :: first_step = .false.
 
       integer, allocatable :: optimize_for_atoms(:)
       integer, allocatable :: thermostat_for_atoms(:)

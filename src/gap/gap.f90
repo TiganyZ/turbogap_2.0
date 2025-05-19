@@ -30,6 +30,8 @@ module gap
    use kinds, only: dp
    use splines
    use timing, only: time_start, time_end
+   use types, only: neighbors_t, calculation_t, split_t, gap_2b_t, gap_3b_t, gap_core_pot_t, species_info_t
+   use control, only: control_t
    implicit none
 
 contains
@@ -240,6 +242,64 @@ contains
 
    end subroutine
 
+   subroutine calculate_gap_2b(neighbors, n_gap_2b, gap_2b_hypers, do_, species_info, species, split, gap_2b, this_gap_2b, time_2b)
+      type(neighbors_t), intent(in)      :: neighbors
+      integer, intent(in)                :: n_gap_2b
+      type(gap_2b_t), intent(in)         :: gap_2b_hypers(:)
+      type(control_t), intent(in)        :: do_
+      type(species_info_t), intent(in)   :: species_info
+      integer, intent(in)                :: species(:)
+      type(split_t), intent(in)          :: split
+      type(calculation_t), intent(inout) :: gap_2b
+      type(calculation_t), intent(inout) :: this_gap_2b
+      real(dp), intent(inout)            :: time_2b(3)
+      integer                            :: i
+
+      if (do_%prediction) then
+         !       Loop through distance_2b descriptors
+         call time_start(time_2b)
+
+         do i = 1, n_gap_2b
+            this_gap_2b%energies = 0.0_dp
+            if (do_%forces) then
+               this_gap_2b%forces = 0.0_dp
+               this_gap_2b%virial = 0.0_dp
+            end if
+            call get_2b_energy_and_forces(neighbors%rjs(split%j_beg:split%j_end), &
+                                          neighbors%xyz(1:3, split%j_beg:split%j_end), &
+                                          gap_2b_hypers(i)%alphas, &
+                                          gap_2b_hypers(i)%cutoff, &
+                                          gap_2b_hypers(i)%rcut, &
+                                          0.5_dp, &
+                                          gap_2b_hypers(i)%delta, &
+                                          gap_2b_hypers(i)%sigma, &
+                                          0.0_dp, &
+                                          gap_2b_hypers(i)%Qs(:, 1), &
+                                          neighbors%n_neigh(split%i_beg:split%i_end), &
+                                          do_%forces, &
+                                          do_%timing, &
+                                          species(split%i_beg:split%i_end), &
+                                          neighbors%neighbor_species(split%j_beg:split%j_end), &
+                                          gap_2b_hypers(i)%species1, &
+                                          gap_2b_hypers(i)%species2, &
+                                          species_info%species_types, &
+                                          this_gap_2b%energies(split%i_beg:split%i_end), &
+                                          this_gap_2b%forces(1:3, split%i_beg:split%i_end), &
+                                          this_gap_2b%virial)
+
+            gap_2b%energies = gap_2b%energies + this_gap_2b%energies
+            if (do_%forces) then
+               gap_2b%forces = gap_2b%forces + this_gap_2b%forces
+               gap_2b%virial = gap_2b%virial + this_gap_2b%virial
+            end if
+
+         end do
+
+         call time_end(time_2b)
+      end if
+
+   end subroutine calculate_gap_2b
+
    subroutine get_2b_energy_and_forces(rjs, xyz, alphas, cutoff, rcut, buffer, delta, sigma, e0, Qs, &
                                        n_neigh, do_forces, do_timing, species, neighbor_species, &
                                        species1, species2, species_types, energies, forces, virial)
@@ -373,6 +433,63 @@ contains
 
    end subroutine
 
+   subroutine calculate_gap_core_pot(neighbors, n_gap_core_pot, gap_core_pot_hypers, do_, &
+                                     species_info, species, split, gap_core_pot, this_gap_core_pot, time_core_pot)
+      type(neighbors_t), intent(in)      :: neighbors
+      integer, intent(in)                :: n_gap_core_pot
+      type(gap_core_pot_t), intent(in)         :: gap_core_pot_hypers(:)
+      type(control_t), intent(in)        :: do_
+      type(species_info_t), intent(in)   :: species_info
+      integer, intent(in)                :: species(:)
+      type(split_t), intent(in)          :: split
+      type(calculation_t), intent(inout) :: gap_core_pot
+      type(calculation_t), intent(inout) :: this_gap_core_pot
+      real(dp), intent(inout)            :: time_core_pot(3)
+      integer                            :: i
+
+      if (do_%prediction) then
+         !       Loop through distance_2b descriptors
+         call time_start(time_core_pot)
+
+         do i = 1, n_gap_core_pot
+            this_gap_core_pot%energies = 0.0_dp
+            if (do_%forces) then
+               this_gap_core_pot%forces = 0.0_dp
+               this_gap_core_pot%virial = 0.0_dp
+            end if
+
+            call get_core_pot_energy_and_forces( &
+               neighbors%rjs(split%j_beg:split%j_end), &
+               neighbors%xyz(1:3, split%j_beg:split%j_end), &
+               gap_core_pot_hypers(i)%x, &
+               gap_core_pot_hypers(i)%V, &
+               gap_core_pot_hypers(i)%yp1, &
+               gap_core_pot_hypers(i)%ypn, &
+               gap_core_pot_hypers(i)%dVdx2, &
+               neighbors%n_neigh(split%i_beg:split%i_end), &
+               do_%forces, &
+               do_%timing, &
+               species(split%i_beg:split%i_end), &
+               neighbors%neighbor_species(split%j_beg:split%j_end), &
+               gap_core_pot_hypers(i)%species1, &
+               gap_core_pot_hypers(i)%species2, &
+               species_info%species_types, &
+               this_gap_core_pot%energies(split%i_beg:split%i_end), &
+               this_gap_core_pot%forces(1:3, split%i_beg:split%i_end), &
+               this_gap_core_pot%virial)
+
+            gap_core_pot%energies = gap_core_pot%energies + this_gap_core_pot%energies
+            if (do_%forces) then
+               gap_core_pot%forces = gap_core_pot%forces + this_gap_core_pot%forces
+               gap_core_pot%virial = gap_core_pot%virial + this_gap_core_pot%virial
+            end if
+
+         end do
+
+         call time_end(time_core_pot)
+      end if
+   end subroutine calculate_gap_core_pot
+
    subroutine get_core_pot_energy_and_forces(rjs, xyz, x, V, yp1, ypn, dVdx2, n_neigh, do_forces, do_timing, species, &
                                              neighbor_species, species1, species2, species_types, energies, forces, &
                                              virial)
@@ -504,6 +621,71 @@ contains
    end subroutine
 
 !**************************************************************************
+!
+!
+
+   subroutine calculate_gap_3b(neighbors, n_gap_3b, gap_3b_hypers, do_, &
+                               species_info, species, split, gap_3b, this_gap_3b, time_3b)
+      type(neighbors_t), intent(in)      :: neighbors
+      integer, intent(in)                :: n_gap_3b
+      type(gap_3b_t), intent(in)         :: gap_3b_hypers(:)
+      type(control_t), intent(in)        :: do_
+      type(species_info_t), intent(in)   :: species_info
+      integer, intent(in)                :: species(:)
+      type(split_t), intent(in)          :: split
+      type(calculation_t), intent(inout) :: gap_3b
+      type(calculation_t), intent(inout) :: this_gap_3b
+      real(dp), intent(inout)            :: time_3b(3)
+      integer                            :: i
+
+      if (do_%prediction) then
+         !       Loop through distance_2b descriptors
+         call time_start(time_3b)
+
+         do i = 1, n_gap_3b
+            this_gap_3b%energies = 0.0_dp
+            if (do_%forces) then
+               this_gap_3b%forces = 0.0_dp
+               this_gap_3b%virial = 0.0_dp
+            end if
+
+            call get_3b_energy_and_forces(neighbors%rjs(split%j_beg:split%j_end), &
+                                          neighbors%xyz(1:3, split%j_beg:split%j_end), &
+                                          gap_3b_hypers(i)%alphas, &
+                                          gap_3b_hypers(i)%cutoff, &
+                                          gap_3b_hypers(i)%rcut, &
+                                          0.5_dp, &
+                                          gap_3b_hypers(i)%delta, &
+                                          gap_3b_hypers(i)%sigma, &
+                                          0.0_dp, &
+                                          gap_3b_hypers(i)%Qs, &
+                                          neighbors%n_neigh(split%i_beg:split%i_end), &
+                                          neighbors%neighbors_list(split%j_beg:split%j_end), &
+                                          do_%forces, &
+                                          do_%timing, &
+                                          gap_3b_hypers(i)%kernel_type, &
+                                          species(split%i_beg:split%i_end), &
+                                          neighbors%neighbor_species(split%j_beg:split%j_end), &
+                                          gap_3b_hypers(i)%species_center, &
+                                          gap_3b_hypers(i)%species1, &
+                                          gap_3b_hypers(i)%species2, &
+                                          species_info%species_types, &
+                                          this_gap_3b%energies(split%i_beg:split%i_end), &
+                                          this_gap_3b%forces, &
+                                          this_gap_3b%virial)
+
+            gap_3b%energies = gap_3b%energies + this_gap_3b%energies
+            if (do_%forces) then
+               gap_3b%forces = gap_3b%forces + this_gap_3b%forces
+               gap_3b%virial = gap_3b%virial + this_gap_3b%virial
+            end if
+
+         end do
+
+         call time_end(time_3b)
+      end if
+   end subroutine calculate_gap_3b
+
    subroutine get_3b_energy_and_forces(rjs, xyz, alphas, cutoff, rcut, buffer, delta, sigma, e0, Qs, &
                                        n_neigh, neighbors_list, do_forces, do_timing, kernel_type, &
                                        species, neighbor_species, species_center, species1, species2, &

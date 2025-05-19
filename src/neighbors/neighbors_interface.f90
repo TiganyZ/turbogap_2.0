@@ -761,5 +761,6 @@ contains
       return
    end subroutine get_fractional_coordinates
 !**************************************************************************
+!
 
 end module neighbors_interface

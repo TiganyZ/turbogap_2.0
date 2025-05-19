@@ -188,17 +188,20 @@ contains
             !! number of elements
             call check_read_parameters_count(input, iostatus, 1)
 
+            !-------------------------------------------------------------------
                               !! Read options for the atoms file and thermo data
             call read_options_general(input, iostatus, rank, keyword, params, &
                                       thermo, species_info, neighbors, &
                                       keyword_found, error_flag)
             if (keyword_found) continue
 
+            !-------------------------------------------------------------------
                                      !! Read options for controlling the program
             call read_options_control(input, iostatus, rank, keyword, do_, &
                                       keyword_found, error_flag)
             if (keyword_found) continue
 
+            !-------------------------------------------------------------------
                                                  !! Read options for controlling
                                                  !! Monte-Carlo
             call read_options_mc(input, iostatus, rank, keyword, mc, &
@@ -206,16 +209,19 @@ contains
                                  species_info%species_types)
             if (keyword_found) continue
 
+            !-------------------------------------------------------------------
                                               !! Read options for controlling MD
             call read_options_md(input, iostatus, rank, keyword, keyword_found, &
                                  md)
             if (keyword_found) continue
 
+            !-------------------------------------------------------------------
             call read_options_vdw(input, iostatus, rank, keyword, options_vdw,&
                  & keyword_found, error_flag, species_info%n_species,&
                  & species_info%species_types)
             if (keyword_found) continue
 
+            !-------------------------------------------------------------------
             call read_exp_options(input, iostatus, rank, keyword, &
                                   keyword_found, do_, &
                                   exp_opt, exp_data, &
@@ -241,6 +247,7 @@ contains
 
 !   Do some checks
 !
+!! FIXME: Add in the checks for temperature as they read zero!
 
       call check_file_exists(params%atoms_file)
       call check_file_exists(params%pot_file)

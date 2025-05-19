@@ -28,6 +28,7 @@
 !! This module contains all subroutines necessary to do monte-carlo in turbogap
 module mc_types
    use kinds, only: dp
+   use types, only: state_t
 
    implicit none
 
@@ -35,12 +36,22 @@ module mc_types
       integer :: n_steps = 0
       integer :: i_step = 0
       integer :: idx = -1
+      integer, allocatable :: id(:)
+      integer :: mu_id = -1
 
       integer :: n_types = 0
       integer :: n_mu = 0
 
+      type(state_t), allocatable :: states(:)
+
       character*32, allocatable :: types(:)
+      character*32 :: move
+
       character*8, allocatable :: species(:)
+      character*8, allocatable :: species_prev(:)
+
+      integer, allocatable :: n_species(:)
+      integer, allocatable :: n_species_prev(:)
 
       real(dp), allocatable :: acceptance(:)
       real(dp), allocatable :: mu_acceptance(:)

@@ -7,7 +7,7 @@ module calculate_gap_soap_mod
    use control, only: control_t, perform_t
 
    use types, only: state_t, neighbors_t, soap_turbo, local_property_soap_turbo, &
-                    input_parameters, split_t, calculation_t
+                    input_parameters, split_t, calculation_t, species_info_t
 
    use calculation, only: reset_calculation
 
@@ -93,6 +93,7 @@ contains
                                  do_, &
                                  perform, &
                                  state, &
+                                 species_info, &
                                  neighbors, &
                                  n_soap, &
                                  soap_turbo_hypers, &
@@ -117,6 +118,7 @@ contains
       type(control_t), intent(in)        :: do_
       type(perform_t), intent(in)        :: perform
       type(state_t), intent(in)          :: state
+      type(species_info_t), intent(in)   :: species_info
       type(neighbors_t), intent(in)      :: neighbors
 
       integer, intent(in)                :: n_soap
@@ -193,6 +195,28 @@ contains
 
       !*************************************************************************
                                                                 !! GAP SOAP loop
+      if (do_%prediction) then
+         !       Assign the e0 to each atom according to its species
+         !        do i = 1, n_sites
+         do i = split%i_beg, split%i_end
+            do j = 1, species_info%n_species
+               if (state%xyz_species(i) == species_info%species_types(j)) then
+                  gap_soap%energies(i) = species_info%e0(j)
+               end if
+            end do
+         end do
+      end if
+
+      !     Collect all energies
+      !     NOTE: Why do we reduce here> Don't we reduce after?
+! #ifdef _MPIF90
+
+!       call time_start(time_mpi)
+!    call mpi_reduce(gap_soap%energies, this_gap_soap%energies, state%n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!       call time_end(time_mpi)
+!       gap_soap%energies = this_gap_soap%energies
+! #endif
+
       do i = 1, n_soap
          !       Compute number of pairs for this SOAP. SOAP has in general a different cutoff than overall max
          !       cutoff, so the number of pairs may be a lot smaller for the SOAP subset.
