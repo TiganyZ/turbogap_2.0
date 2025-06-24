@@ -264,28 +264,52 @@ contains
             if (do_%forces) then
                this_gap_2b%forces = 0.0_dp
                this_gap_2b%virial = 0.0_dp
+
+               call get_2b_energy_and_forces(neighbors%rjs(split%j_beg:split%j_end), &
+                                             neighbors%xyz(1:3, split%j_beg:split%j_end), &
+                                             gap_2b_hypers(i)%alphas, &
+                                             gap_2b_hypers(i)%cutoff, &
+                                             gap_2b_hypers(i)%rcut, &
+                                             0.5_dp, &
+                                             gap_2b_hypers(i)%delta, &
+                                             gap_2b_hypers(i)%sigma, &
+                                             0.0_dp, &
+                                             gap_2b_hypers(i)%Qs(:, 1), &
+                                             neighbors%n_neigh(split%i_beg:split%i_end), &
+                                             do_%forces, &
+                                             do_%timing, &
+                                             species(split%i_beg:split%i_end), &
+                                             neighbors%neighbor_species(split%j_beg:split%j_end), &
+                                             gap_2b_hypers(i)%species1, &
+                                             gap_2b_hypers(i)%species2, &
+                                             species_info%species_types, &
+                                             this_gap_2b%energies(split%i_beg:split%i_end), &
+                                             this_gap_2b%forces(1:3, split%i_beg:split%i_end), &
+                                             this_gap_2b%virial)
+            else
+
+               call get_2b_energy_and_forces(neighbors%rjs(split%j_beg:split%j_end), &
+                                             neighbors%xyz(1:3, split%j_beg:split%j_end), &
+                                             gap_2b_hypers(i)%alphas, &
+                                             gap_2b_hypers(i)%cutoff, &
+                                             gap_2b_hypers(i)%rcut, &
+                                             0.5_dp, &
+                                             gap_2b_hypers(i)%delta, &
+                                             gap_2b_hypers(i)%sigma, &
+                                             0.0_dp, &
+                                             gap_2b_hypers(i)%Qs(:, 1), &
+                                             neighbors%n_neigh(split%i_beg:split%i_end), &
+                                             do_%forces, &
+                                             do_%timing, &
+                                             species(split%i_beg:split%i_end), &
+                                             neighbors%neighbor_species(split%j_beg:split%j_end), &
+                                             gap_2b_hypers(i)%species1, &
+                                             gap_2b_hypers(i)%species2, &
+                                             species_info%species_types, &
+                                             this_gap_2b%energies(split%i_beg:split%i_end), &
+                                             this_gap_2b%forces, &
+                                             this_gap_2b%virial)
             end if
-            call get_2b_energy_and_forces(neighbors%rjs(split%j_beg:split%j_end), &
-                                          neighbors%xyz(1:3, split%j_beg:split%j_end), &
-                                          gap_2b_hypers(i)%alphas, &
-                                          gap_2b_hypers(i)%cutoff, &
-                                          gap_2b_hypers(i)%rcut, &
-                                          0.5_dp, &
-                                          gap_2b_hypers(i)%delta, &
-                                          gap_2b_hypers(i)%sigma, &
-                                          0.0_dp, &
-                                          gap_2b_hypers(i)%Qs(:, 1), &
-                                          neighbors%n_neigh(split%i_beg:split%i_end), &
-                                          do_%forces, &
-                                          do_%timing, &
-                                          species(split%i_beg:split%i_end), &
-                                          neighbors%neighbor_species(split%j_beg:split%j_end), &
-                                          gap_2b_hypers(i)%species1, &
-                                          gap_2b_hypers(i)%species2, &
-                                          species_info%species_types, &
-                                          this_gap_2b%energies(split%i_beg:split%i_end), &
-                                          this_gap_2b%forces(1:3, split%i_beg:split%i_end), &
-                                          this_gap_2b%virial)
 
             gap_2b%energies = gap_2b%energies + this_gap_2b%energies
             if (do_%forces) then
@@ -456,27 +480,50 @@ contains
             if (do_%forces) then
                this_gap_core_pot%forces = 0.0_dp
                this_gap_core_pot%virial = 0.0_dp
-            end if
 
-            call get_core_pot_energy_and_forces( &
-               neighbors%rjs(split%j_beg:split%j_end), &
-               neighbors%xyz(1:3, split%j_beg:split%j_end), &
-               gap_core_pot_hypers(i)%x, &
-               gap_core_pot_hypers(i)%V, &
-               gap_core_pot_hypers(i)%yp1, &
-               gap_core_pot_hypers(i)%ypn, &
-               gap_core_pot_hypers(i)%dVdx2, &
-               neighbors%n_neigh(split%i_beg:split%i_end), &
-               do_%forces, &
-               do_%timing, &
-               species(split%i_beg:split%i_end), &
-               neighbors%neighbor_species(split%j_beg:split%j_end), &
-               gap_core_pot_hypers(i)%species1, &
-               gap_core_pot_hypers(i)%species2, &
-               species_info%species_types, &
-               this_gap_core_pot%energies(split%i_beg:split%i_end), &
-               this_gap_core_pot%forces(1:3, split%i_beg:split%i_end), &
-               this_gap_core_pot%virial)
+               call get_core_pot_energy_and_forces( &
+                  neighbors%rjs(split%j_beg:split%j_end), &
+                  neighbors%xyz(1:3, split%j_beg:split%j_end), &
+                  gap_core_pot_hypers(i)%x, &
+                  gap_core_pot_hypers(i)%V, &
+                  gap_core_pot_hypers(i)%yp1, &
+                  gap_core_pot_hypers(i)%ypn, &
+                  gap_core_pot_hypers(i)%dVdx2, &
+                  neighbors%n_neigh(split%i_beg:split%i_end), &
+                  do_%forces, &
+                  do_%timing, &
+                  species(split%i_beg:split%i_end), &
+                  neighbors%neighbor_species(split%j_beg:split%j_end), &
+                  gap_core_pot_hypers(i)%species1, &
+                  gap_core_pot_hypers(i)%species2, &
+                  species_info%species_types, &
+                  this_gap_core_pot%energies(split%i_beg:split%i_end), &
+                  this_gap_core_pot%forces(1:3, split%i_beg:split%i_end), &
+                  this_gap_core_pot%virial)
+
+            else
+
+               call get_core_pot_energy_and_forces( &
+                  neighbors%rjs(split%j_beg:split%j_end), &
+                  neighbors%xyz(1:3, split%j_beg:split%j_end), &
+                  gap_core_pot_hypers(i)%x, &
+                  gap_core_pot_hypers(i)%V, &
+                  gap_core_pot_hypers(i)%yp1, &
+                  gap_core_pot_hypers(i)%ypn, &
+                  gap_core_pot_hypers(i)%dVdx2, &
+                  neighbors%n_neigh(split%i_beg:split%i_end), &
+                  do_%forces, &
+                  do_%timing, &
+                  species(split%i_beg:split%i_end), &
+                  neighbors%neighbor_species(split%j_beg:split%j_end), &
+                  gap_core_pot_hypers(i)%species1, &
+                  gap_core_pot_hypers(i)%species2, &
+                  species_info%species_types, &
+                  this_gap_core_pot%energies(split%i_beg:split%i_end), &
+                  this_gap_core_pot%forces, &
+                  this_gap_core_pot%virial)
+
+            end if
 
             gap_core_pot%energies = gap_core_pot%energies + this_gap_core_pot%energies
             if (do_%forces) then
@@ -624,7 +671,7 @@ contains
 !
 !
 
-   subroutine calculate_gap_3b(neighbors, n_gap_3b, gap_3b_hypers, do_, &
+   subroutine calculate_gap_3b(n_sites0, neighbors, n_gap_3b, gap_3b_hypers, do_, &
                                species_info, species, split, gap_3b, this_gap_3b, time_3b)
       type(neighbors_t), intent(in)      :: neighbors
       integer, intent(in)                :: n_gap_3b
@@ -636,6 +683,7 @@ contains
       type(calculation_t), intent(inout) :: gap_3b
       type(calculation_t), intent(inout) :: this_gap_3b
       real(dp), intent(inout)            :: time_3b(3)
+      integer, intent(in)                :: n_sites0
       integer                            :: i
 
       if (do_%prediction) then
@@ -649,7 +697,8 @@ contains
                this_gap_3b%virial = 0.0_dp
             end if
 
-            call get_3b_energy_and_forces(neighbors%rjs(split%j_beg:split%j_end), &
+            call get_3b_energy_and_forces(n_sites0, &
+                                          neighbors%rjs(split%j_beg:split%j_end), &
                                           neighbors%xyz(1:3, split%j_beg:split%j_end), &
                                           gap_3b_hypers(i)%alphas, &
                                           gap_3b_hypers(i)%cutoff, &
@@ -686,7 +735,7 @@ contains
       end if
    end subroutine calculate_gap_3b
 
-   subroutine get_3b_energy_and_forces(rjs, xyz, alphas, cutoff, rcut, buffer, delta, sigma, e0, Qs, &
+   subroutine get_3b_energy_and_forces(n_sites0, rjs, xyz, alphas, cutoff, rcut, buffer, delta, sigma, e0, Qs, &
                                        n_neigh, neighbors_list, do_forces, do_timing, kernel_type, &
                                        species, neighbor_species, species_center, species1, species2, &
                                        species_types, energies, forces, virial)
@@ -700,6 +749,7 @@ contains
       character*3, intent(in) :: kernel_type
       character*8, intent(in) :: species_center, species1, species2, species_types(:)
 
+      integer, intent(in) :: n_sites0
 !   Output variables
       real(dp), intent(out) :: energies(:), forces(:, :), virial(1:3, 1:3)
 
@@ -710,7 +760,7 @@ contains
                   xyz12_red(1:3), xyz13_red(1:3), xyz23_red(1:3), this_force(1:3)
       real(dp), allocatable :: r(:), drdq(:, :), kernel(:), drdx1(:, :), drdx2(:, :), drdx3(:, :), pref(:), &
                                kernel_der(:)
-      integer :: n_sparse, i, j, k, k2, n_sites, n_atom_pairs, s, j2, i3, j3, k3, l, sp0, sp1, sp2, n_sites0, k1, k4
+      integer :: n_sparse, i, j, k, k2, n_sites, n_atom_pairs, s, j2, i3, j3, k3, l, sp0, sp1, sp2, k1, k4
 
       if (do_timing) then
          call cpu_time(time1)
@@ -721,7 +771,8 @@ contains
       n_sparse = size(alphas)
       n_sites = size(n_neigh)
       n_atom_pairs = size(rjs)
-      n_sites0 = size(forces, 2)
+
+      !  n_sites0 = size(forces, 2)
 
 !   Map species to index
       do i = 1, size(species_types)

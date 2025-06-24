@@ -7,7 +7,7 @@ module calculate_gap_soap_mod
    use control, only: control_t, perform_t
 
    use types, only: state_t, neighbors_t, soap_turbo, local_property_soap_turbo, &
-                    input_parameters, split_t, calculation_t, species_info_t
+                    input_parameters, split_t, calculation_t, species_info_t, change_in_state_t
 
    use calculation, only: reset_calculation
 
@@ -20,6 +20,7 @@ module calculate_gap_soap_mod
 contains
 
    subroutine reset_local_properties(reallocate, &
+                                     changed_n_sites, &
                                      do_forces, &
                                      rebuild_neighbors_list, &
                                      n_sites, &
@@ -34,40 +35,49 @@ contains
                                      this_local_properties_cart_der_pt)
 
       logical, intent(in)           :: reallocate
+      logical, intent(in)           :: changed_n_sites
       logical, intent(in)           :: do_forces
       logical, intent(in)           :: rebuild_neighbors_list
       integer, intent(in)           :: n_sites
       integer, intent(in)           :: n_atom_pairs
       integer, intent(in)           :: n_atom_pairs_prev
       integer, intent(in)           :: n_local_properties
-      real(dp), intent(inout), allocatable, target :: local_properties(:, :)
+      real(dp), intent(inout), allocatable :: local_properties(:, :)
       real(dp), intent(inout), allocatable, target :: this_local_properties(:, :)
 
-      real(dp), intent(inout), allocatable, target :: local_properties_cart_der(:, :, :)
+      real(dp), intent(inout), allocatable :: local_properties_cart_der(:, :, :)
       real(dp), intent(inout), allocatable, target :: this_local_properties_cart_der(:, :, :)
 
       real(dp), intent(inout), contiguous, pointer :: this_local_properties_pt(:, :)
       real(dp), intent(inout), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
 
-      if (reallocate) then
+      if (reallocate .or. changed_n_sites) then
          if (allocated(local_properties)) then
             nullify (this_local_properties_pt)
             deallocate (this_local_properties, local_properties)
             if (do_forces) then
-               nullify (this_local_properties_cart_der_pt)
-               deallocate (this_local_properties_cart_der, local_properties_cart_der)
+               if (allocated(local_properties_cart_der)) then
+                  nullify (this_local_properties_cart_der_pt)
+                  deallocate (this_local_properties_cart_der, local_properties_cart_der)
+               end if
             end if
          end if
          allocate (local_properties(n_sites, n_local_properties), source=0.0_dp)
          allocate (this_local_properties(n_sites, n_local_properties), source=0.0_dp)
          this_local_properties_pt => this_local_properties
       else
-         ! if (allocated(this_local_properties)) then
-         !    print *, "renullifying "
-         !    nullify (this_local_properties_pt)
-         !    this_local_properties_pt => this_local_properties
-         ! end if
-         local_properties = 0.0_dp
+         if (allocated(local_properties)) then
+            if ((size(local_properties, 1) /= size(this_local_properties, 1)) .or. &
+                (size(local_properties, 2) /= size(this_local_properties, 2))) then
+
+               nullify (this_local_properties_pt)
+               deallocate (this_local_properties)
+               allocate (this_local_properties(n_sites, n_local_properties), source=0.0_dp)
+               this_local_properties_pt => this_local_properties
+            else
+               local_properties = 0.0_dp
+            end if
+         end if
       end if
 
       if (do_forces) then
@@ -92,6 +102,7 @@ contains
    subroutine calculate_gap_soap(rank, &
                                  do_, &
                                  perform, &
+                                 changed, &
                                  state, &
                                  species_info, &
                                  neighbors, &
@@ -120,6 +131,7 @@ contains
       type(state_t), intent(in)          :: state
       type(species_info_t), intent(in)   :: species_info
       type(neighbors_t), intent(in)      :: neighbors
+      type(change_in_state_t)          :: changed
 
       integer, intent(in)                :: n_soap
       type(soap_turbo), intent(in)       :: soap_turbo_hypers(:)
@@ -128,10 +140,10 @@ contains
       integer, intent(in)                :: n_local_properties
       integer, intent(in)                :: local_properties_indexes(:)
 
-      real(dp), intent(inout), allocatable, target :: local_properties(:, :)
+      real(dp), intent(inout), allocatable :: local_properties(:, :)
       real(dp), intent(inout), allocatable, target :: this_local_properties(:, :)
 
-      real(dp), intent(inout), allocatable, target :: local_properties_cart_der(:, :, :)
+      real(dp), intent(inout), allocatable :: local_properties_cart_der(:, :, :)
       real(dp), intent(inout), allocatable, target :: this_local_properties_cart_der(:, :, :)
 
                                             !! Pointers for the local properties
@@ -177,6 +189,7 @@ contains
 
       if (perform%local_properties) then
          call reset_local_properties(perform%reallocate, &
+                                     changed%n_sites, &
                                      do_%forces, &
                                      do_%rebuild_neighbors_list, &
                                      state%n_sites, &

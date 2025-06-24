@@ -28,13 +28,13 @@
 !! This module contains all subroutines necessary to do monte-carlo in turbogap
 module mc_types
    use kinds, only: dp
-   use types, only: state_t
+   use types, only: state_t, assignment(=)
 
    implicit none
 
    type mc_t
       integer :: n_steps = 0
-      integer :: i_step = 0
+      integer :: i_step = -1
       integer :: idx = -1
       integer, allocatable :: id(:)
       integer :: mu_id = -1
@@ -83,6 +83,8 @@ module mc_types
       logical  :: planes_restrict_to_polyhedron = .false.
       real(dp), allocatable :: max_dist_to_planes(:)
       real(dp), allocatable :: planes(:)
+
+      logical :: converged = .false.
 
    end type mc_t
 

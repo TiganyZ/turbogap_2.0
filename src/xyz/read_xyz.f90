@@ -183,6 +183,41 @@ contains
       end if
    end subroutine read_xyz_file
 
+   subroutine recalculate_supercell(state, rcut_max)
+      type(state_t), intent(inout) :: state
+      real(dp), intent(in) :: rcut_max
+
+      state%indices_prev = state%indices
+
+      state%a_box = state%a_box/dfloat(state%indices_prev(1))
+      state%b_box = state%b_box/dfloat(state%indices_prev(2))
+      state%c_box = state%c_box/dfloat(state%indices_prev(3))
+
+      call number_of_unit_cells_for_given_cutoff( &
+         state%a_box, &
+         state%b_box, &
+         state%c_box, &
+         rcut_max, [.true., .true., .true.], state%indices)
+
+      if (state%indices(1) > 1 .or. state%indices(2) > 1 .or. state%indices(3) > 1) then
+         state%n_sites_supercell = state%n_sites &
+                                   *state%indices(1) &
+                                   *state%indices(2) &
+                                   *state%indices(3)
+
+         !call reallocate_state_supercell(state, do_%need_velocities, state%n_sites_supercell)
+         call reallocate_state_supercell(state, state%n_sites_supercell)
+
+         call set_supercell(state) !, do_%need_velocities)
+
+      else
+         call set_normal_cell(state) !, do_%need_velocities, do_%supercell_check_only)
+      end if
+
+      if (allocated(state%positions_wrapped)) deallocate (state%positions_wrapped)
+      allocate (state%positions_wrapped(1:3, size(state%positions, 2)), source=state%positions)
+   end subroutine recalculate_supercell
+
    subroutine read_xyz_lines(xyz_file, iostatus, do_, state, species_info, properties, &
                              has_velocities, need_velocities)
       integer, intent(in) :: xyz_file

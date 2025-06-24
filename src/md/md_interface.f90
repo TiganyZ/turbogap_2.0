@@ -72,9 +72,8 @@ contains
       integer :: i
 
       if (rank == 0) then
-         call print_warning("You have not provided initial velocities/randomize&
-              & velocities is on. TurboGAP is randomizing them to&
-              & match your initial temperature. ")
+         call print_warning("Ranndomizing velocities to&
+              & match initial temperature. ")
          call print_parameter("t_beg", thermo%t_beg)
       end if
 
@@ -665,8 +664,10 @@ contains
          ! Initialize time
          md%time = 0.0_dp
          md%time_step = md%step
+         if (allocated(md%optimize_for_atoms)) deallocate (md%optimize_for_atoms)
          allocate (md%optimize_for_atoms(1:state%n_sites))
          md%optimize_for_atoms = [(i, i=1, state%n_sites)]
+         converged = .false.
       end if
 
       if (perform%reallocate) then
@@ -677,6 +678,33 @@ contains
          allocate (md%positions_diff(1:3, 1:size(state%positions, 2)), source=0.0_dp)
          allocate (md%positions_prev(1:3, 1:size(state%positions, 2)), source=0.0_dp)
          allocate (md%forces_prev(1:3, 1:state%n_sites), source=0.0_dp)
+      end if
+
+      if (allocated(md%positions_prev)) then
+         if (size(md%positions_prev, 2) /= state%n_sites) then
+            if (allocated(md%positions_diff)) deallocate (md%positions_diff)
+            if (allocated(md%positions_prev)) deallocate (md%positions_prev)
+            if (allocated(md%forces_prev)) deallocate (md%forces_prev)
+
+            allocate (md%positions_diff(1:3, 1:size(state%positions, 2)), source=0.0_dp)
+            allocate (md%positions_prev(1:3, 1:size(state%positions, 2)), source=0.0_dp)
+            allocate (md%forces_prev(1:3, 1:state%n_sites), source=0.0_dp)
+         end if
+      end if
+
+      if (allocated(state%velocities)) then
+         if (size(state%velocities, 2) /= state%n_sites) then
+            deallocate (state%velocities)
+            allocate (state%velocities(3, state%n_sites), source=0.0_dp)
+
+            call reset_velocities(state, thermo, 0)
+         end if
+      end if
+
+      if (.not. allocated(state%velocities)) then
+         allocate (state%velocities(3, state%n_sites), source=0.0_dp)
+
+         call reset_velocities(state, thermo, 0)
       end if
 
       !     We wrap the positions and remoce CM velocity
@@ -946,8 +974,8 @@ contains
                                  get_target_state_variable(md%i_step, md%n_steps, thermo%p_beg, thermo%p_end), &
                                  instant_pressure_tensor, md%barostat_sym, md%tau_p, md%gamma_p, md%time_step)
 
-         call print_parameter("target pressure", &
-                              get_target_state_variable(md%i_step, md%n_steps, thermo%p_beg, thermo%p_end))
+         ! call print_parameter("target pressure", &
+         !                      get_target_state_variable(md%i_step, md%n_steps, thermo%p_beg, thermo%p_end))
 
          state%a_box(1:3) = lv(1:3, 1)
          state%b_box(1:3) = lv(1:3, 2)
@@ -1086,9 +1114,6 @@ contains
 
       end do
 
-      call print_parameter("max iter norm pos", max_diff)
-      call print_parameter("max iter pos idx", max_diff_idx)
-
       do i = 1, state%n_sites
          if ( &
             dsqrt(md%positions_diff(1, i)**2 &
@@ -1114,7 +1139,9 @@ contains
 
       ! Exit conditions
 
-      if (converged_md) then
+      converged = converged .or. (md%i_step >= md%n_steps)
+
+      if (converged) then
          if (.not. do_%hybrid_mc) then
             exit_loop = .true.
          end if
@@ -1126,8 +1153,7 @@ contains
       call print_small_message("MD step")
       call print_parameter("Step  #", md%i_step)
       call print_parameter("n_steps", md%n_steps)
-      call print_parameter("converged", converged_md)
-      call print_parameter("MD Energies", converged_md)
+      call print_parameter("converged", converged)
    end subroutine calculate_md_step
 
    subroutine set_supercell_positions(n_sites, positions, a_box, b_box, c_box, indices)

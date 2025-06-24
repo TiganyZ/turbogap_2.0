@@ -100,6 +100,7 @@ contains
       real(dp), intent(inout) :: time_soap(3)
       real(dp), intent(inout) :: time_local_properties(3)
 
+      logical :: local_do_derivatives
 !   CLEAN THIS UP
       real(dp) :: time1, time2
 
@@ -238,7 +239,9 @@ contains
 
 !   Get SOAP vectors and derivatives:
       allocate (soap(1:n_soap, 1:n_sites), source=0.0_dp)
-      if (do_derivatives) then
+
+      local_do_derivatives = do_derivatives .or. do_forces
+      if (local_do_derivatives) then
          allocate (soap_cart_der(1:3, 1:n_soap, 1:n_atom_pairs), source=0.0_dp)
       end if
 
@@ -248,7 +251,7 @@ contains
                        thetas, phis, alpha_max, l_max, rcut_hard, rcut_soft, nf, global_scaling, &
                        atom_sigma_r, atom_sigma_r_scaling, atom_sigma_t, atom_sigma_t_scaling, &
                        amplitude_scaling, radial_enhancement, central_weight, basis, scaling_mode, do_timing, &
-                       do_derivatives, compress_soap, compress_P_nonzero, compress_P_i, compress_P_j, &
+                       local_do_derivatives, compress_soap, compress_P_nonzero, compress_P_i, compress_P_j, &
                        compress_P_el, soap, soap_cart_der)
          call time_end(time_soap)
       end if
@@ -262,13 +265,13 @@ contains
          !call cpu_time(time1)
          ! We need to iterate over the number of local properties
          allocate (local_properties(1:n_sites))
-         if (do_derivatives) then
+         if (local_do_derivatives) then
             allocate (local_properties_cart_der(1:3, 1:n_atom_pairs))
          end if
 
          do i4 = 1, n_local_properties
             local_properties = 0._dp
-            if (do_derivatives) then
+            if (local_do_derivatives) then
                local_properties_cart_der = 0._dp
             end if
 
@@ -278,18 +281,18 @@ contains
                                         local_property_models(i4)%V0, &
                                         local_property_models(i4)%delta, &
                                         local_property_models(i4)%zeta, local_properties, &
-                                        do_derivatives, soap_cart_der, n_neigh, &
+                                        local_do_derivatives, soap_cart_der, n_neigh, &
                                         local_properties_cart_der)
 
             ! call local_property_predict( soap, Qs, alphas, V0, delta, zeta, &
-            !      local_property, do_derivatives, soap_cart_der, n_neigh_out, &
+            !      local_property, local_do_derivatives, soap_cart_der, n_neigh_out, &
             !      local_property_cart_der )
 
             do i = 1, n_sites
                i2 = in_to_out_site(i)
                local_properties0(i2, local_property_indexes(lp_index + i4)) = local_properties(i)
             end do
-            if (do_derivatives) then
+            if (local_do_derivatives) then
                do k = 1, n_atom_pairs
                   k2 = in_to_out_pairs(k)
                   local_properties_cart_der0(1:3, k2, local_property_indexes(lp_index + i4)) &
@@ -299,7 +302,7 @@ contains
          end do
 
          deallocate (local_properties)
-         if (do_derivatives) then
+         if (local_do_derivatives) then
             deallocate (local_properties_cart_der)
          end if
 
@@ -345,7 +348,7 @@ contains
          allocate (soap(1:n_soap, 1:n_sites0), source=soap_temp)
          deallocate (soap_temp)
       end if
-      if (do_derivatives .and. write_derivatives) then
+      if (local_do_derivatives .and. write_derivatives) then
          allocate (der_neighbors(1:n_sites))
          allocate (der_neighbors_list(1:n_atom_pairs))
          der_neighbors = n_neigh
@@ -372,7 +375,7 @@ contains
       if (.not. write_soap) then
          deallocate (soap)
       end if
-      if (do_derivatives .and. .not. write_derivatives) then
+      if (local_do_derivatives .and. .not. write_derivatives) then
          deallocate (soap_cart_der)
       end if
 

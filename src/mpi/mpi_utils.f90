@@ -28,7 +28,7 @@
 module mpi_utils
    use kinds, only: dp
    use md_types, only: md_t
-   use types, only: state_t, memory_t, calculation_t
+   use types, only: state_t, memory_t, calculation_t, change_in_state_t
    use control, only: control_t
    use state_interface, only: reallocate_state
    use timing, only: time_start, time_end
@@ -37,7 +37,286 @@ module mpi_utils
 #endif
    implicit none
 
+   interface synchronize_array
+      module procedure synchronize_array_int_1
+      module procedure synchronize_array_dp_1
+      module procedure synchronize_array_dp_2
+      module procedure synchronize_array_char_1
+      module procedure synchronize_array_logical_1
+      module procedure synchronize_array_logical_2
+   end interface synchronize_array
+
 contains
+
+   ! subroutine compare_arrays_from_rank( array, rank )
+   !   real( dp ), intent(in) :: array(:,:)
+   !   integer, intent(in) :: rank
+   !   integer :: n_1, n_2
+   !   real( dp ), allocatable :: sent_array(:, :)
+   !
+
+   subroutine synchronize_array_char_1(array, rank)
+      character*8, allocatable, intent(inout) :: array(:)
+      integer, intent(in) :: rank
+      logical :: alloc
+      integer :: ierr
+      integer :: n1
+
+#ifdef _MPIF90
+      if (rank == 0) then
+         alloc = allocated(array)
+      end if
+
+      call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+      if (alloc) then
+         if (rank == 0) then
+            n1 = size(array, 1)
+         end if
+
+         call MPI_bcast(n1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+         if (rank /= 0) then
+            if (allocated(array)) then
+               if (size(array, 1) /= n1) then
+                  deallocate (array)
+               end if
+            end if
+            if (.not. allocated(array)) then
+               allocate (array(n1))
+            end if
+         end if
+
+         call MPI_bcast(array, 8*n1, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+      end if
+#endif
+   end subroutine synchronize_array_char_1
+
+   subroutine synchronize_array_logical_1(array, rank)
+      logical, allocatable, intent(inout) :: array(:)
+      integer, intent(in) :: rank
+      logical :: alloc
+      integer :: ierr
+      integer :: n1
+
+#ifdef _MPIF90
+      if (rank == 0) then
+         alloc = allocated(array)
+      end if
+
+      call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+      if (alloc) then
+         if (rank == 0) then
+            n1 = size(array, 1)
+         end if
+
+         call MPI_bcast(n1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+         if (rank /= 0) then
+            if (allocated(array)) then
+               if (size(array, 1) /= n1) then
+                  deallocate (array)
+               end if
+            end if
+            if (.not. allocated(array)) then
+               allocate (array(n1))
+            end if
+         end if
+
+         call MPI_bcast(array, n1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      end if
+#endif
+   end subroutine synchronize_array_logical_1
+
+   subroutine synchronize_array_logical_2(array, rank)
+      logical, allocatable, intent(inout) :: array(:, :)
+      integer, intent(in) :: rank
+      logical :: alloc
+      integer :: ierr
+      integer :: n1, n2
+
+#ifdef _MPIF90
+      if (rank == 0) then
+         alloc = allocated(array)
+      end if
+
+      call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+      if (alloc) then
+         if (rank == 0) then
+            n1 = size(array, 1)
+            n2 = size(array, 2)
+         end if
+
+         call MPI_bcast(n1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+         call MPI_bcast(n2, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+         if (rank /= 0) then
+            if (allocated(array)) then
+               if (size(array, 1) /= n1 .or. size(array, 2) /= n2) then
+                  deallocate (array)
+               end if
+            end if
+            if (.not. allocated(array)) then
+               allocate (array(n1, n2))
+            end if
+         end if
+
+         call MPI_bcast(array, n1*n2, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      end if
+#endif
+   end subroutine synchronize_array_logical_2
+
+   subroutine synchronize_array_int_1(array, rank)
+      integer, allocatable, intent(inout) :: array(:)
+      integer, intent(in) :: rank
+      logical :: alloc
+      integer :: ierr
+      integer :: n1
+
+#ifdef _MPIF90
+      if (rank == 0) then
+         alloc = allocated(array)
+      end if
+
+      call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+      if (alloc) then
+         if (rank == 0) then
+            n1 = size(array, 1)
+         end if
+
+         call MPI_bcast(n1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+         if (rank /= 0) then
+            if (allocated(array)) then
+               if (size(array, 1) /= n1) then
+                  deallocate (array)
+               end if
+            end if
+            if (.not. allocated(array)) then
+               allocate (array(n1))
+            end if
+         end if
+
+         call MPI_bcast(array, n1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      end if
+#endif
+   end subroutine synchronize_array_int_1
+
+   subroutine synchronize_array_dp_1(array, rank)
+      real(dp), allocatable, intent(inout) :: array(:)
+      integer, intent(in) :: rank
+      logical :: alloc
+      integer :: ierr
+      integer :: n1
+
+#ifdef _MPIF90
+      if (rank == 0) then
+         alloc = allocated(array)
+      end if
+
+      call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+      if (alloc) then
+         if (rank == 0) then
+            n1 = size(array, 1)
+         end if
+
+         call MPI_bcast(n1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+         if (rank /= 0) then
+            if (allocated(array)) then
+               if (size(array, 1) /= n1) then
+                  deallocate (array)
+               end if
+            end if
+            if (.not. allocated(array)) then
+               allocate (array(n1))
+            end if
+         end if
+
+         call MPI_bcast(array, n1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      end if
+#endif
+   end subroutine synchronize_array_dp_1
+
+   subroutine synchronize_array_dp_2(array, rank)
+      real(dp), allocatable, intent(inout) :: array(:, :)
+      integer, intent(in) :: rank
+      logical :: alloc
+      integer :: ierr
+      integer :: n1, n2
+
+#ifdef _MPIF90
+      if (rank == 0) then
+         alloc = allocated(array)
+      end if
+
+      call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+      if (alloc) then
+         if (rank == 0) then
+            n1 = size(array, 1)
+            n2 = size(array, 2)
+         end if
+
+         call MPI_bcast(n1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+         call MPI_bcast(n2, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+         if (rank /= 0) then
+            if (allocated(array)) then
+               if (size(array, 1) /= n1 .or. size(array, 2) /= n2) then
+                  deallocate (array)
+               end if
+            end if
+            if (.not. allocated(array)) then
+               allocate (array(n1, n2))
+            end if
+         end if
+
+         call MPI_bcast(array, n1*n2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+      end if
+#endif
+
+   end subroutine synchronize_array_dp_2
+
+   subroutine synchronize_state(state, rank)
+      type(state_t), intent(inout) :: state
+      type(state_t) :: state_temp
+      integer, intent(in) :: rank
+      integer :: ierr
+
+#ifdef _MPIF90
+
+      call MPI_bcast(state%n_sites, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%n_sites_supercell, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%n_sites_prev, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%n_local_properties, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+      call MPI_bcast(state%a_box, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%b_box, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%c_box, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%indices, 3, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%indices_prev, 3, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+      call MPI_bcast(state%volume, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%volume_prev, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+      call synchronize_array(state%positions, rank)
+      call synchronize_array(state%positions_supercell, rank)
+      call synchronize_array(state%local_properties, rank)
+
+      call synchronize_array(state%species, rank)
+      call synchronize_array(state%species_supercell, rank)
+      call synchronize_array(state%xyz_species, rank)
+      call synchronize_array(state%xyz_species_supercell, rank)
+      call synchronize_array(state%fix_atom, rank)
+
+#endif
+   end subroutine synchronize_state
 
    subroutine allocate_state(state, do_)
       implicit none
@@ -158,6 +437,8 @@ contains
          end if
       end if
 
+      state%n_sites_prev = state%n_sites
+
       call MPI_bcast(state%positions, state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
       call MPI_bcast(state%a_box, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
@@ -218,8 +499,10 @@ contains
 
    end subroutine collect_calculation
 
-   subroutine broadcast_md(exit_loop, rebuild_neighbors_list, state, time_mpi)
+   subroutine broadcast_md(exit_loop, rebuild_neighbors_list, state, converged, do_md, time_mpi)
       logical, intent(inout) :: exit_loop
+      logical, intent(inout) :: converged
+      logical, intent(inout) :: do_md
       logical, intent(inout) :: rebuild_neighbors_list
       type(state_t), intent(inout) :: state
       real(dp), intent(inout) :: time_mpi(3)
@@ -228,6 +511,8 @@ contains
 #ifdef _MPIF90
       call time_start(time_mpi)
       call mpi_bcast(exit_loop, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(converged, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(do_md, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
       call mpi_bcast(rebuild_neighbors_list, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
@@ -244,25 +529,48 @@ contains
 #endif
    end subroutine broadcast_md
 
-   subroutine broadcast_mc(state, do_, rank, md, move, time_mpi)
-      type(state_t), intent(inout) :: state
-      type(control_t), intent(inout) :: do_
-      type(md_t), intent(inout) :: md
+   subroutine broadcast_mc(rebuild_neighbors_list, do_md, do_forces, &
+                           do_need_velocities, md_i_step, changed, exit_loop, mc_converged, &
+                           md_converged, rank)
+      type(change_in_state_t), intent(inout) :: changed
+      logical, intent(inout) :: exit_loop
+      logical, intent(inout) :: do_md
+      logical, intent(inout) :: do_forces
+      logical, intent(inout) :: do_need_velocities
+      integer, intent(inout) :: md_i_step
+      logical, intent(inout) :: rebuild_neighbors_list
+      logical, intent(inout) :: mc_converged
+      logical, intent(inout) :: md_converged
       integer, intent(in) :: rank
-      real(dp), intent(inout) :: time_mpi(3)
-      character*32, intent(inout) :: move
       integer :: ierr
 
 #ifdef _MPIF90
-      call time_start(time_mpi)
-      call mpi_bcast(do_%rebuild_neighbors_list, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-      call mpi_bcast(do_%md, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-      call mpi_bcast(md%i_step, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-      ! Optimize and the other parameters don't need to be broadcast as they are used by rank 0
+      ! Now synchronize the state across processes
 
-      call broadcast_state(state, do_, rank)
+      call mpi_bcast(rebuild_neighbors_list, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(mc_converged, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(md_converged, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(do_md, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(md_i_step, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-      call time_end(time_mpi)
+      do_need_velocities = .false.
+      do_forces = .false.
+
+      exit_loop = mc_converged
+      do_forces = do_md
+      if (rank == 0) then
+         if (do_forces) then
+            do_need_velocities = .true.
+         end if
+      end if
+
+      call mpi_bcast(exit_loop, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(changed%n_sites, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(changed%positions, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(changed%lattice, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(changed%species, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(changed%masses, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
 #endif
 
    end subroutine broadcast_mc

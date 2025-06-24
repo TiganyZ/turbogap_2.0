@@ -256,6 +256,14 @@ contains
             opened_file_trajectory = .true.
             open (unit=file_thermo, file="thermo.log", status="unknown")
             opened_file_thermo = .true.
+
+            if (do_%hybrid_mc) then
+               open (unit=file_mc, file="mc_all.xyz", status="unknown")
+               opened_file_mc = .true.
+               open (unit=file_mc_log, file="mc.log", status="unknown")
+               opened_file_mc_log = .true.
+            end if
+
          else if (do_%mc) then
             open (unit=file_mc, file="mc_all.xyz", status="unknown")
             opened_file_mc = .true.
@@ -266,14 +274,13 @@ contains
             opened_file_trajectory = .true.
          end if
 
-      end if
+         if (opened_file_thermo) then
+            call initialize_thermo_file(file_thermo, do_, format_thermo)
+         end if
 
-      if (opened_file_thermo) then
-         call initialize_thermo_file(file_thermo, do_, format_thermo)
-      end if
-
-      if (opened_file_mc_log) then
-         call initialize_mc_log_file(file_mc_log, do_, n_species, format_mc_log)
+         if (opened_file_mc_log) then
+            call initialize_mc_log_file(file_mc_log, do_, n_species, format_mc_log)
+         end if
       end if
 
    end subroutine open_files

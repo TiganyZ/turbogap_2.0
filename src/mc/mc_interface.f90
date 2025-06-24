@@ -29,13 +29,14 @@
 module mc_interface
    use kinds, only: dp
    use control, only: control_t, perform_t
+   use calculation, only: allocate_calculation
    use mc_types, only: mc_t
    use md_types, only: md_t
-   use types, only: state_t, input_parameters, species_info_t, thermo_t, calculation_t, energy_t
+   use types, only: state_t, change_in_state_t, input_parameters, species_info_t, thermo_t, calculation_t, energy_t, assignment(=), assign_state
    use timing, only: time_start, time_end
    use printing, only: print_error, print_debug, print_note, print_message, print_warning, print_parameter, print_separator
 
-   use state_interface, only: reallocate_state
+   use state_interface, only: reallocate_state, reallocate_state_out, print_state, reset_state
    use mc_utils
    use write_xyz, only: write_extxyz
 
@@ -127,6 +128,14 @@ contains
 
    end subroutine perform_mc
 
+   pure function check_converged_mc(mc_i_step, mc_n_steps) result(converged)
+      integer, intent(in) :: mc_i_step
+      integer, intent(in) :: mc_n_steps
+      logical :: converged
+
+      converged = (mc_i_step >= mc_n_steps)
+   end function check_converged_mc
+
    subroutine initialize_mc(state, species_info, mc, do_, current, trial)
       type(state_t), intent(inout) :: state
       type(mc_t), intent(inout) :: mc
@@ -161,16 +170,17 @@ contains
          end do
       end if
 
-      call reallocate_state(mc%states(current), state%n_local_properties, do_%need_velocities, state%n_sites)
-      call reallocate_state(mc%states(trial), state%n_local_properties, do_%need_velocities, state%n_sites)
+      if (.not. mc%hamiltonian) state%E_kinetic = 0.d0
 
-      mc%states(current) = state
+      call assign_state(mc%states(current), state)
+      call assign_state(mc%states(trial), state)
 
    end subroutine initialize_mc
 
-   subroutine calculate_mc_step(state, local_property_labels, species_info, thermo, mc, md, perform,&
-        & do_, total, file_mc, file_mc_log, format_mc_log, time, time_writing)
+   subroutine calculate_mc_step(state, changed, local_property_labels, species_info, thermo, mc, md, perform,&
+        & do_, converged_md, total, file_mc, file_mc_log, format_mc_log, time, time_writing)
       type(state_t), intent(inout) :: state
+      type(change_in_state_t), intent(out) :: changed
       type(mc_t), intent(inout) :: mc
       type(md_t), intent(inout) :: md
       character*1024, allocatable, intent(in)   :: local_property_labels(:)
@@ -182,6 +192,7 @@ contains
       type(species_info_t), intent(in) :: species_info
       type(thermo_t), intent(in) :: thermo
       type(calculation_t), intent(inout) :: total
+      logical, intent(inout) :: converged_md
       character*1024 :: energies_string
       type(md_t) :: md_fake
       integer, allocatable :: species_idx(:)
@@ -207,29 +218,28 @@ contains
          if (.not. mc%hamiltonian) state%E_kinetic = 0.d0
 
          ! Record the trial state
-         if (state%n_sites /= mc%states(trial)%n_sites) then
-            call reallocate_state(mc%states(trial), state%n_local_properties, do_%need_velocities, state%n_sites)
-         end if
-         mc%states(trial) = state
+         !if (state%n_sites /= mc%states(trial)%n_sites .or. state%n_sites_supercell /= mc%states(trial)%n_sites_supercell) then
+         ! call reset_state(mc%states(trial))
+         ! call reallocate_state(mc%states(trial), state%n_local_properties, &
+         !                       do_%need_velocities, state%n_sites, state%n_sites_supercell)
+         ! call move_alloc(mc%states(trial)%positions_supercell, mc%states(trial)%positions)
+         !end if
+         !
+         call assign_state(mc%states(trial), state)
+         ! mc%states(trial) = state
+
+         ! call reallocate_state(state, mc%states(trial)%n_local_properties, &
+         !                       do_%need_velocities, state%n_sites, state%n_sites_supercell)
+         ! call move_alloc(state%positions_supercell, state%positions)
+
+         !call assign_state(state, mc%states(trial))
+         ! state = mc%states(trial)
 
          ! Reset control parameters for MD
          if (mc%move == "relax" .or. mc%move == "md" .or. (mc%relax .and. mc%relax)) then
             md%i_step = -1
             do_%md = .false.
          end if
-
-         call print_message("MC Iteration")
-         call print_parameter("mc step", mc%i_step)
-         call print_parameter(" / mc n_steps", mc%n_steps)
-         call print_parameter("mc move type", mc%move)
-
-         if (trim(mc%move) == "insertion" .or. trim(mc%move) == "removal") then
-            call print_parameter("mc species", mc%species(mc%mu_id))
-            call print_parameter("mc mu", mc%mu(mc%mu_id), 'eV')
-         end if
-
-         call print_parameter("Energy current", mc%states(current)%energy + mc%states(current)%E_kinetic)
-         call print_parameter("Energy trial", mc%states(trial)%energy + mc%states(trial)%E_kinetic)
 
          ! if (mc%accessible_volume) then
          !    call get_accessible_volume(v_uc, v_a_uc, species, params%radii)
@@ -264,6 +274,19 @@ contains
             'accepted?', p_accept > ranf, ' p_accept =', p_accept, ' ranf = ', ranf
          !          Add acceptance to the log file else dont
 
+         call print_message("MC Iteration")
+         call print_parameter("mc step", mc%i_step)
+         call print_parameter(" / mc n_steps", mc%n_steps)
+         call print_parameter("mc move", mc%move)
+
+         if (trim(mc%move) == "insertion" .or. trim(mc%move) == "removal") then
+            call print_parameter("mc species", mc%species(mc%mu_id))
+            call print_parameter("mc mu", mc%mu(mc%mu_id), 'eV')
+         end if
+
+         call print_parameter("Energy current", mc%states(current)%energy + mc%states(current)%E_kinetic)
+         call print_parameter("Energy trial", mc%states(trial)%energy + mc%states(trial)%E_kinetic)
+
          call write_mc_log( &
             file_mc_log, format_mc_log, &
             mc%i_step, mc%move, p_accept > ranf, &
@@ -271,40 +294,52 @@ contains
             mc%states(trial)%energy + mc%states(trial)%E_kinetic, &
             mc%states(current)%energies%exp, &
             mc%states(trial)%energies%exp, &
-            mc%n_mu, mc%n_species, mc%species &
+            mc%states(trial)%n_sites, mc%n_mu, mc%n_species, mc%species &
             )
 
+         state%n_sites_prev = mc%states(trial)%n_sites
+         mc%states(current)%n_sites_prev = mc%states(trial)%n_sites
+
          if (p_accept > ranf) then
-            ! Set variables
-            mc%states(current) = mc%states(trial)
-            state%n_sites_prev = state%n_sites
-            state%volume_prev = state%volume
-            !   Assigning the default image with the accepted one
+            ! Then change the trial state into the current state!
+            call assign_state(mc%states(current), mc%states(trial))
          end if
+      end if
 
-         if (perform%write_xyz) then
+      if (state%n_sites /= mc%states(current)%n_sites) then
+         call allocate_calculation(mc%states(current)%n_sites, total, do_%forces)
+      end if
 
-            call time_start(time_writing)
+      call assign_state(state, mc%states(current))
 
-            call wrap_pbc(state)
+      if (perform%write_xyz) then
 
-            ! call get_xyz_energy_string(energies_soap, energies_2b, &
-            !                            energies_3b, energies_core_pot, energies_vdw, energies_exp, &
-            !                            energies_lp, energies_pdf, energies_sf, energies_xrd, &
-            !                            energies_nd, do_%valid_pdf, do_%valid_sf, do_%valid_xrd, do_ &
-            !                            %valid_nd, do_%pair_distribution, do_%structure_factor, do_%xrd, &
-            !                            do_%nd, string)
+         call time_start(time_writing)
 
-            md_fake%i_step = mc%i_step
+         call wrap_pbc(state)
 
-            call write_extxyz(file_mc, do_, state, md_fake, total, &
-                              local_property_labels, state%local_properties, &
-                              energies_string)
+         ! call get_xyz_energy_string(energies_soap, energies_2b, &
+         !                            energies_3b, energies_core_pot, energies_vdw, energies_exp, &
+         !                            energies_lp, energies_pdf, energies_sf, energies_xrd, &
+         !                            energies_nd, do_%valid_pdf, do_%valid_sf, do_%valid_xrd, do_ &
+         !                            %valid_nd, do_%pair_distribution, do_%structure_factor, do_%xrd, &
+         !                            do_%nd, string)
 
-            call time_end(time_writing)
-         end if
+         md_fake%i_step = mc%i_step
 
+         energies_string = ""
+         call write_extxyz(file_mc, do_, state, md_fake, total, &
+                           local_property_labels, state%local_properties, &
+                           energies_string)
+
+         call time_end(time_writing)
+      end if
+
+      mc%converged = check_converged_mc(mc%i_step, mc%n_steps)
+
+      if (.not. mc%converged) then
          call perform_mc_step( &
+            changed, &
             state%positions, &
             state%species, &
             state%xyz_species, &
@@ -364,11 +399,21 @@ contains
             mc%n_planes, &
             mc%planes, &
             mc%max_dist_to_planes, &
-            mc%planes_restrict_to_polyhedron)
-
-         do_%rebuild_neighbors_list = .true.
-
+            mc%planes_restrict_to_polyhedron, &
+            do_%forces, &
+            do_%need_velocities, &
+            converged_md)
       end if
+
+      if (state%n_sites /= state%n_sites_prev) then
+         changed%n_sites = .true.
+      end if
+
+      do_%rebuild_neighbors_list = .true.
+
+      ! if (changed%n_sites) then
+      !    perform%reallocate = .true.
+      ! end if
 
       call time_end(time)
    end subroutine calculate_mc_step

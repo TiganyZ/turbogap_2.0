@@ -28,7 +28,6 @@
 
 module types
    use kinds, only: dp
-
    implicit none
   !! This file contains the general types which are operated on by TurboGAP
   !! State is the main state of the program, which contains the positions,
@@ -124,6 +123,15 @@ module types
       real(dp) :: xps = 0.0_dp
    end type energy_t
 
+   type change_in_state_t
+      logical :: n_sites = .false.
+      logical :: n_sites_prev = .false.
+      logical :: lattice = .false.
+      logical :: positions = .false.
+      logical :: species = .false.
+      logical :: masses = .false.
+   end type change_in_state_t
+
    type state_t
                            !! The state of the system, positions, velocities etc
       ! Number of atoms
@@ -131,6 +139,7 @@ module types
       integer :: n_sites_prev = -1
       integer :: n_sites_supercell = -1
       integer :: this_n_sites_mpi = -1
+      integer :: n_local_properties
 
      !! Lattice parameters
       real(dp) :: a_box(3) = [1.0_dp, 0.0_dp, 0.0_dp]
@@ -140,6 +149,15 @@ module types
       integer  :: indices_prev(3) = 1
       real(dp) :: volume = 1.0_dp
       real(dp) :: volume_prev = 1.0_dp
+
+      ! Energy
+      real(dp)    :: energy = 0.0_dp
+      real(dp)    :: E_kinetic = 0.0_dp
+      type(energy_t) :: energies
+
+      ! Instant temperature
+      real(dp)    :: instant_temp = 0.0_dp
+      real(dp)    :: instant_pressure = 0.0_dp
 
       ! Dynamical state
       real(dp), allocatable    :: positions(:, :)
@@ -163,17 +181,8 @@ module types
       logical, allocatable     :: fix_atom(:, :)
 
       ! Local properties
-      integer :: n_local_properties
       real(dp), allocatable :: local_properties(:, :)
 
-      ! Energy
-      real(dp)    :: energy = 0.0_dp
-      real(dp)    :: E_kinetic = 0.0_dp
-      type(energy_t) :: energies
-
-      ! Instant temperature
-      real(dp)    :: instant_temp = 0.0_dp
-      real(dp)    :: instant_pressure = 0.0_dp
    end type state_t
 
                           !! Type for splitting atoms/neighbors to mpi processes
@@ -358,7 +367,112 @@ module types
       character*8, allocatable :: xyz_species(:), xyz_species_supercell(:)
    end type image
 
+                             !! Interface for the assignment of state explicitly
+   interface assignment(=)
+      module procedure assign_state
+   end interface
+
 contains
+
+   subroutine assign_state(lhs, rhs)
+      type(state_t), intent(out) :: lhs
+      type(state_t), intent(in)  :: rhs
+
+      integer :: i
+
+      ! Copy intrinsic types
+      lhs%n_sites = rhs%n_sites
+      lhs%n_sites_prev = rhs%n_sites_prev
+      lhs%n_sites_supercell = rhs%n_sites_supercell
+      lhs%this_n_sites_mpi = rhs%this_n_sites_mpi
+      lhs%n_local_properties = rhs%n_local_properties
+      lhs%a_box = rhs%a_box
+      lhs%b_box = rhs%b_box
+      lhs%c_box = rhs%c_box
+      lhs%indices = rhs%indices
+      lhs%indices_prev = rhs%indices_prev
+      lhs%volume = rhs%volume
+      lhs%volume_prev = rhs%volume_prev
+      lhs%energy = rhs%energy
+      lhs%E_kinetic = rhs%E_kinetic
+      lhs%instant_temp = rhs%instant_temp
+      lhs%instant_pressure = rhs%instant_pressure
+
+      lhs%energies = rhs%energies
+
+      if (allocated(rhs%positions)) then
+         allocate (lhs%positions, source=rhs%positions)
+      else
+         if (allocated(lhs%positions)) deallocate (lhs%positions)
+      end if
+
+      if (allocated(rhs%positions_wrapped)) then
+         allocate (lhs%positions_wrapped, source=rhs%positions_wrapped)
+      else
+         if (allocated(lhs%positions_wrapped)) deallocate (lhs%positions_wrapped)
+      end if
+
+      if (allocated(rhs%velocities)) then
+         allocate (lhs%velocities, source=rhs%velocities)
+      else
+         if (allocated(lhs%velocities)) deallocate (lhs%velocities)
+      end if
+
+      if (allocated(rhs%positions_supercell)) then
+         allocate (lhs%positions_supercell, source=rhs%positions_supercell)
+      else
+         if (allocated(lhs%positions_supercell)) deallocate (lhs%positions_supercell)
+      end if
+
+      if (allocated(rhs%velocities_supercell)) then
+         allocate (lhs%velocities_supercell, source=rhs%velocities_supercell)
+      else
+         if (allocated(lhs%velocities_supercell)) deallocate (lhs%velocities_supercell)
+      end if
+
+      if (allocated(rhs%species)) then
+         allocate (lhs%species, source=rhs%species)
+      else
+         if (allocated(lhs%species)) deallocate (lhs%species)
+      end if
+
+      if (allocated(rhs%xyz_species)) then
+         allocate (lhs%xyz_species, source=rhs%xyz_species)
+      else
+         if (allocated(lhs%xyz_species)) deallocate (lhs%xyz_species)
+      end if
+
+      if (allocated(rhs%species_supercell)) then
+         allocate (lhs%species_supercell, source=rhs%species_supercell)
+      else
+         if (allocated(lhs%species_supercell)) deallocate (lhs%species_supercell)
+      end if
+
+      if (allocated(rhs%xyz_species_supercell)) then
+         allocate (lhs%xyz_species_supercell, source=rhs%xyz_species_supercell)
+      else
+         if (allocated(lhs%xyz_species_supercell)) deallocate (lhs%xyz_species_supercell)
+      end if
+
+      if (allocated(rhs%masses)) then
+         allocate (lhs%masses, source=rhs%masses)
+      else
+         if (allocated(lhs%masses)) deallocate (lhs%masses)
+      end if
+
+      if (allocated(rhs%fix_atom)) then
+         allocate (lhs%fix_atom, source=rhs%fix_atom)
+      else
+         if (allocated(lhs%fix_atom)) deallocate (lhs%fix_atom)
+      end if
+
+      if (allocated(rhs%local_properties)) then
+         allocate (lhs%local_properties, source=rhs%local_properties)
+      else
+         if (allocated(lhs%local_properties)) deallocate (lhs%local_properties)
+      end if
+
+   end subroutine assign_state
 
 !**************************************************************************
 ! This provides a way to pass all the individual arrays/variables in the main

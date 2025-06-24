@@ -166,6 +166,16 @@ contains
          is_box_square = .false.
          if (rank == 0 .and. print_shape_warning) then
             print_shape_warning = .false.
+            print *, "state%a_box(1)", state%a_box(1)
+            print *, "state%a_box(2)", state%a_box(2)
+            print *, "state%a_box(3)", state%a_box(3)
+            print *, "state%b_box(1)", state%b_box(1)
+            print *, "state%b_box(2)", state%b_box(2)
+            print *, "state%b_box(3)", state%b_box(3)
+            print *, "state%c_box(1)", state%c_box(1)
+            print *, "state%c_box(2)", state%c_box(2)
+            print *, "state%c_box(3)", state%c_box(3)
+
             write (*, *) '                                       |'
             write (*, *) 'WARNING: your simulation box is not    |  <-- WARNING'
             write (*, *) 'orthorhombic; this will lead to slower |'

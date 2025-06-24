@@ -320,16 +320,24 @@ contains
 
    end subroutine print_message
 
-   subroutine print_debug(message, location)
+   subroutine print_debug(message, location, rank)
       character(len=*) :: message, location
       character*32 :: debug = 'debug'
+      integer, intent(in), optional :: rank
+      character*8 :: rank_str
+
+      if (present(rank)) then
+         write (rank_str, '(I4,1X)') rank
+      else
+         rank_str = ""
+      end if
 
       call print_separator('X')
       call print_separator(' ')
       call print_unbroken_lines(location, debug)
       call print_separator(' ')
 
-      call print_unbroken_lines(message, debug)
+      call print_unbroken_lines(rank_str//message, debug)
 
       call print_separator(' ')
       call print_separator('X')
