@@ -570,7 +570,7 @@ contains
                                                    !! Prepare MPI load splitting
 
                         !! Set i_beg and i_end which split atoms among MPI tasks
-         if (perform%reallocate) &
+         if (perform%reallocate .or. changed%n_sites) &
             call split_tasks(state%n_sites, n_tasks, rank, split)
 
 #ifdef _DEBUG
@@ -579,44 +579,43 @@ contains
 
                                                   !! Finished MPI load splitting
          !*************************************************************************
-         !
 
          !*************************************************************************
                                                            !! Building neighbors
 
          !> The neighbors list in turbogap is in the following format
-      !!
-      !! Each atom has a number of neighbors, n_neigh. The number of atomic
-      !! neighbors for a site i, is found by neighbors%n_neigh(i)
-      !!
-      !! The actual neighbor list, the indices of neighboring atoms to a
-      !! particular site i, is found by summing over all of the numbers of
-      !! neighbors, adding these numbers to a counter, and then one can index
-      !! into the list from that point on.
-      !!
-      !! e.g. for site 100
-      !!
-      !! n_neigh_site_100 = n_neigh(100)
-      !! k = sum(n_neigh(1:99))
-      !! site_100_neighbors = neighbor_list( k: k + n_neigh(100) )
-      !!
-      !! Note that the first neighbor is always itself!
-      !!
-      !! It is efficient for one to do this in a loop over the neighbors, as
-      !! most of the time, that is what we'd like to do
-      !! i.e.
-      !! k = 0
-      !! do i = 1, n_sites
-      !!    pos_1 = positions(:,i)
-      !!    do j = 1, n_neigh(i)
-      !!       k = k + 1
-      !!       neigh_index = neighbor_list( k )
-      !!       if ( neigh_index == i ) continue
-      !!       pos_2 = positions(:,neigh_index)
-      !!       call calculate_pairwise_thing( pos_1, pos_2, pairwise_thing, &
-      !!                                      options_pairwise_thing)
-      !!    end do
-      !! end do
+         !!
+         !! Each atom has a number of neighbors, n_neigh. The number of atomic
+         !! neighbors for a site i, is found by neighbors%n_neigh(i)
+         !!
+         !! The actual neighbor list, the indices of neighboring atoms to a
+         !! particular site i, is found by summing over all of the numbers of
+         !! neighbors, adding these numbers to a counter, and then one can index
+         !! into the list from that point on.
+         !!
+         !! e.g. for site 100
+         !!
+         !! n_neigh_site_100 = n_neigh(100)
+         !! k = sum(n_neigh(1:99))
+         !! site_100_neighbors = neighbor_list( k: k + n_neigh(100) )
+         !!
+         !! Note that the first neighbor is always itself!
+         !!
+         !! It is efficient for one to do this in a loop over the neighbors, as
+         !! most of the time, that is what we'd like to do
+         !! i.e.
+         !! k = 0
+         !! do i = 1, n_sites
+         !!    pos_1 = positions(:,i)
+         !!    do j = 1, n_neigh(i)
+         !!       k = k + 1
+         !!       neigh_index = neighbor_list( k )
+         !!       if ( neigh_index == i ) continue
+         !!       pos_2 = positions(:,neigh_index)
+         !!       call calculate_pairwise_thing( pos_1, pos_2, pairwise_thing, &
+         !!                                      options_pairwise_thing)
+         !!    end do
+         !! end do
 
          if (perform%neighbors) then
             call time_start(time%neighbors)
@@ -825,13 +824,17 @@ contains
 #ifdef _MPIF90
          call time_start(time%mpi)
 
-         call collect_calculation(do_%forces, state%n_sites, gap_soap, this_gap_soap, state%energies%gap_soap)
+         call collect_calculation(do_%forces, state%n_sites, gap_soap,&
+              & this_gap_soap, state%energies%gap_soap)
 
-         call collect_calculation(do_%forces, state%n_sites, gap_2b, this_gap_2b, state%energies%gap_2b)
+         call collect_calculation(do_%forces, state%n_sites, gap_2b,&
+              & this_gap_2b, state%energies%gap_2b)
 
-         call collect_calculation(do_%forces, state%n_sites, gap_3b, this_gap_3b, state%energies%gap_3b)
+         call collect_calculation(do_%forces, state%n_sites, gap_3b,&
+              & this_gap_3b, state%energies%gap_3b)
 
-         call collect_calculation(do_%forces, state%n_sites, gap_core_pot, this_gap_core_pot, state%energies%gap_core_pot)
+         call collect_calculation(do_%forces, state%n_sites, gap_core_pot,&
+              & this_gap_core_pot, state%energies%gap_core_pot)
 
          call time_end(time%mpi)
 
@@ -926,11 +929,11 @@ contains
 
                call wrap_pbc_cell(state)
 
-               call calculate_md_step(do_, perform, md, state, total, thermo, &
-                                      file_thermo, format_thermo, file_trajectory, &
-                                      local_property_labels, local_properties, &
-                                      neighbors%buffer, energy%exp, energies_string, &
-                                      converged_md, time%writing, time%mpi, rank, exit_loop)
+               call calculate_md_step(do_, perform, md, state, total, thermo,&
+                    & file_thermo, format_thermo, file_trajectory,&
+                    & local_property_labels, local_properties, neighbors%buffer,&
+                    & energy%exp, energies_string, converged_md, time%writing,&
+                    & time%mpi, rank, exit_loop)
 
                energy%kinetic = state%E_kinetic
                call print_energies(state%energies, do_)
@@ -943,6 +946,8 @@ contains
             call broadcast_md(exit_loop, do_%rebuild_neighbors_list, state, converged_md, do_%md, time%mpi)
 
             call synchronize_state(state, rank)
+
+            print *, rank, state%n_sites, size(state%positions, 2), size(gap_soap%energies, 1), size(gap_soap%forces, 2), size(local_properties, 1), size(state%local_properties, 1)
 
             call time_end(time%mpi)
             if (exit_loop) &

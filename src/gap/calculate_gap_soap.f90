@@ -53,11 +53,17 @@ contains
 
       if (reallocate .or. changed_n_sites) then
          if (allocated(local_properties)) then
-            nullify (this_local_properties_pt)
+            if (associated(this_local_properties_pt)) then
+               nullify (this_local_properties_pt)
+            end if
+
             deallocate (this_local_properties, local_properties)
             if (do_forces) then
                if (allocated(local_properties_cart_der)) then
-                  nullify (this_local_properties_cart_der_pt)
+                  if (associated(this_local_properties_cart_der_pt)) then
+                     nullify (this_local_properties_cart_der_pt)
+                  end if
+
                   deallocate (this_local_properties_cart_der, local_properties_cart_der)
                end if
             end if
@@ -82,7 +88,7 @@ contains
 
       if (do_forces) then
          if (reallocate .or. (n_atom_pairs > n_atom_pairs_prev) &
-             .or. .not. allocated(local_properties_cart_der)) then
+             .or. .not. allocated(local_properties_cart_der) .or. changed_n_sites) then
             if (allocated(local_properties_cart_der)) &
                deallocate (local_properties_cart_der, this_local_properties_cart_der)
 

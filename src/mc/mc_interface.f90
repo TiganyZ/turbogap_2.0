@@ -217,23 +217,7 @@ contains
          ! We do not need kinetic energy if we aren't doing hamiltonian mc
          if (.not. mc%hamiltonian) state%E_kinetic = 0.d0
 
-         ! Record the trial state
-         !if (state%n_sites /= mc%states(trial)%n_sites .or. state%n_sites_supercell /= mc%states(trial)%n_sites_supercell) then
-         ! call reset_state(mc%states(trial))
-         ! call reallocate_state(mc%states(trial), state%n_local_properties, &
-         !                       do_%need_velocities, state%n_sites, state%n_sites_supercell)
-         ! call move_alloc(mc%states(trial)%positions_supercell, mc%states(trial)%positions)
-         !end if
-         !
          call assign_state(mc%states(trial), state)
-         ! mc%states(trial) = state
-
-         ! call reallocate_state(state, mc%states(trial)%n_local_properties, &
-         !                       do_%need_velocities, state%n_sites, state%n_sites_supercell)
-         ! call move_alloc(state%positions_supercell, state%positions)
-
-         !call assign_state(state, mc%states(trial))
-         ! state = mc%states(trial)
 
          ! Reset control parameters for MD
          if (mc%move == "relax" .or. mc%move == "md" .or. (mc%relax .and. mc%relax)) then
@@ -269,11 +253,6 @@ contains
          if (mc%move == "insertion") mc%n_species(mc%mu_id) = mc%n_species(mc%mu_id) + 1
          if (mc%move == "removal") mc%n_species(mc%mu_id) = mc%n_species(mc%mu_id) - 1
 
-         !    ACCEPT OR REJECT
-         write (*, '(A,1X,A,1X,A,L4,1X,A,ES12.6,1X,A,1X,ES12.6)') 'Is ', trim(mc%move), &
-            'accepted?', p_accept > ranf, ' p_accept =', p_accept, ' ranf = ', ranf
-         !          Add acceptance to the log file else dont
-
          call print_message("MC Iteration")
          call print_parameter("mc step", mc%i_step)
          call print_parameter(" / mc n_steps", mc%n_steps)
@@ -286,6 +265,10 @@ contains
 
          call print_parameter("Energy current", mc%states(current)%energy + mc%states(current)%E_kinetic)
          call print_parameter("Energy trial", mc%states(trial)%energy + mc%states(trial)%E_kinetic)
+
+         !    ACCEPT OR REJECT
+         write (*, '(A,1X,A,1X,A,L4,1X,A,ES12.6,1X,A,1X,ES12.6)') 'Is ', trim(mc%move), &
+            'accepted?', p_accept > ranf, ' p_accept =', p_accept, ' ranf = ', ranf
 
          call write_mc_log( &
             file_mc_log, format_mc_log, &
@@ -307,6 +290,7 @@ contains
       end if
 
       if (state%n_sites /= mc%states(current)%n_sites) then
+         changed%n_sites = .true.
          call allocate_calculation(mc%states(current)%n_sites, total, do_%forces)
       end if
 

@@ -344,14 +344,14 @@ contains
          backspace (input)
          read (input, *, iostat=iostatus) cjunk, cjunk, thermo%p_beg
          if (rank == 0) &
-            call print_parameter("p_beg", thermo%p_beg)
+            call print_parameter("p_beg", thermo%p_beg, 'bar')
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
       else if (keyword == 'p_end') then
          backspace (input)
          read (input, *, iostat=iostatus) cjunk, cjunk, thermo%p_end
          if (rank == 0) &
-            call print_parameter("p_end", thermo%p_end)
+            call print_parameter("p_end", thermo%p_end, 'bar')
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
       else if (keyword == 'neighbors_buffer') then

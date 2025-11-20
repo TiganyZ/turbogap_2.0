@@ -411,6 +411,13 @@ contains
             call print_parameter("do_write_xyz", do_%write_xyz)
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
+      else if (keyword == 'write_thermo') then
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, do_%write_thermo
+         if (rank == 0) &
+            call print_parameter("do_write_thermo", do_%write_thermo)
+         call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'print_progress') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%print_progress

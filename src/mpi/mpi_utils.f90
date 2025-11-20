@@ -69,6 +69,12 @@ contains
 
       call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
+      if (.not. alloc .and. allocated(array)) then
+         if (rank /= 0) then
+            deallocate (array)
+         end if
+      end if
+
       if (alloc) then
          if (rank == 0) then
             n1 = size(array, 1)
@@ -106,6 +112,12 @@ contains
 
       call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
+      if (.not. alloc .and. allocated(array)) then
+         if (rank /= 0) then
+            deallocate (array)
+         end if
+      end if
+
       if (alloc) then
          if (rank == 0) then
             n1 = size(array, 1)
@@ -142,6 +154,12 @@ contains
       end if
 
       call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+      if (.not. alloc .and. allocated(array)) then
+         if (rank /= 0) then
+            deallocate (array)
+         end if
+      end if
 
       if (alloc) then
          if (rank == 0) then
@@ -182,6 +200,12 @@ contains
 
       call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
+      if (.not. alloc .and. allocated(array)) then
+         if (rank /= 0) then
+            deallocate (array)
+         end if
+      end if
+
       if (alloc) then
          if (rank == 0) then
             n1 = size(array, 1)
@@ -219,6 +243,12 @@ contains
 
       call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
+      if (.not. alloc .and. allocated(array)) then
+         if (rank /= 0) then
+            deallocate (array)
+         end if
+      end if
+
       if (alloc) then
          if (rank == 0) then
             n1 = size(array, 1)
@@ -255,6 +285,12 @@ contains
       end if
 
       call MPI_bcast(alloc, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+      if (.not. alloc .and. allocated(array)) then
+         if (rank /= 0) then
+            deallocate (array)
+         end if
+      end if
 
       if (alloc) then
          if (rank == 0) then

@@ -124,21 +124,42 @@ contains
       instant_pressure = (kB*dfloat(n_sites - 1)*instant_temp &
                           + (virial(1, 1) + virial(2, 2) + virial(3, 3))/3.0_dp)/volume*eVperA3tobar
    end function get_instant_pressure
+   subroutine StripSpaces(string)
+      character(len=*) :: string
+      integer :: stringLen
+      integer :: last, actual
 
+      stringLen = len(string)
+      last = 1
+      actual = 1
+
+      do while (actual < stringLen)
+         if (string(last:last) == ' ') then
+            actual = actual + 1
+            string(last:last) = string(actual:actual)
+            string(actual:actual) = ' '
+         else
+            last = last + 1
+            if (actual < last) &
+               actual = last
+         end if
+      end do
+
+   end subroutine
    subroutine get_formatted_file_strings(n_quantities, write_quantities, quantities,&
         & format_quantities, format_length, string, format_string)
-      integer, intent(in)        :: n_quantities
-      logical, intent(in)                    :: write_quantities(n_quantities)
+      integer, intent(in)          :: n_quantities
+      logical, intent(in)          :: write_quantities(n_quantities)
 
-      character(len=*), intent(in)        :: quantities(n_quantities)
+      character(len=*), intent(in) :: quantities(n_quantities)
 
-      character(len=*), intent(in)      :: format_quantities(n_quantities)
-      integer                    :: format_length(n_quantities)
+      character(len=*), intent(in) :: format_quantities(n_quantities)
+      integer                      :: format_length(n_quantities)
 
-      character*20               :: temp_string
-      character*20               :: temp_string2
-      character*1024, intent(out)     :: string
-      character*1024, intent(out) :: format_string
+      character*20                 :: temp_string
+      character*20                 :: temp_string2
+      character*1024, intent(out)  :: string
+      character*1024, intent(out)  :: format_string
 
       integer :: i
       integer :: n_write
@@ -167,10 +188,26 @@ contains
                format_length(i) = format_length(i) - 1
 
             if (format_length(i) - 1 < 10) then
-               write (temp_string, '(A7,I1,A1)') '(A,1X,A', format_length(i), ')'
+               write (temp_string, '("(A,1X,A",I1,")")') format_length(i)
+               ! call StripSpaces(temp_string)
+               ! write (temp_string, '(A7)') '(A,1X,A'
+               ! call StripSpaces(temp_string)
+               ! write (temp_string, '(A7,I1)') adjustl(trim(temp_string)), format_length(i)
+               ! call StripSpaces(temp_string)
+               ! write (temp_string, '(A8,A1)') adjustl(trim(temp_string)), ')'
+               ! call StripSpaces(temp_string)
             else
-               write (temp_string, '(A7,I2,A1)') '(A,1X,A', format_length(i), ')'
+               write (temp_string, '("(A,1X,A",I2,")")') format_length(i)
+               ! call StripSpaces(temp_string)
+               ! write (temp_string, '(A7)') '(A,1X,A'
+               ! call StripSpaces(temp_string)
+               ! write (temp_string, '(A7,I2)') adjustl(trim(temp_string)), format_length(i)
+               ! call StripSpaces(temp_string)
+               ! write (temp_string, '(A9,A1)') adjustl(trim(temp_string)), ')'
+               ! call StripSpaces(temp_string)
+               !write (temp_string, '(A7,I2,A1)') '(A,1X,A', format_length(i), ')'
             end if
+            print *, "temp_string1", temp_string
 
             n_start = len(quantities(i)) - format_length(i) + 1
             n_end = len(quantities(i))
@@ -182,22 +219,42 @@ contains
             n_end = len(format_quantities(i))
 
             n_str = len_trim(adjustl(format_string)) + (n_end - n_start + 1) + 3
+            print *, "n_str", n_str
 
             if (n_str < 10) then
-               write (temp_string, '(A7,I1,A3)') '(A', n_str, 'A1)'
+               write (temp_string, '("(A",I1,",A1)")') n_str
+               temp_string = adjustl(temp_string)
             else if (n_str < 100) then
-               write (temp_string, '(A7,I2,A3)') '(A', n_str, 'A1)'
+               write (temp_string, '("(A",I2,",A1)")') n_str
+               ! write (temp_string, '(A7,I2,A3)') '(A', n_str, 'A1)'
+               temp_string = adjustl(temp_string)
             else
                ! if n_str > 1000
-               write (temp_string, '(A7,I3,A3)') '(A', n_str, 'A1)'
+               write (temp_string, '("(A",I3,",A1)")') n_str
+               ! write (temp_string, '(A7,I3,A3)') '(A', n_str, 'A1)'
+               temp_string = adjustl(temp_string)
             end if
 
             if (count == n_write) then
+               print *, "format_string_prefinal", format_string
+               print *, "temp_string_prefinal", temp_string
+               print *, "format_quantities(i) (n_start:n_end), ", format_quantities(i) (n_start:n_end)
                write (format_string, temp_string) trim(adjustl(format_string))//'1X,'// &
                   format_quantities(i) (n_start:n_end), ')'
+               format_string = adjustl(format_string)
+               print *, "format_string_final", format_string
+               print *, "temp_string_final", temp_string
             else
+               print *, "format_string_prefinal", format_string
+               print *, "temp_string_prefinal", temp_string
+               print *, "format_quantities(i) (n_start:n_end), ", format_quantities(i) (n_start:n_end)
+               print *, trim(adjustl(format_string))//'1X,'// &
+                  format_quantities(i) (n_start:n_end), ','
                write (format_string, temp_string) trim(adjustl(format_string))//'1X,'// &
                   format_quantities(i) (n_start:n_end), ','
+               format_string = adjustl(format_string)
+               print *, "format_string_final", format_string
+               print *, "temp_string_final", temp_string
             end if
          end if
       end do
