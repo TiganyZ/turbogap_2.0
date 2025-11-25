@@ -38,7 +38,7 @@ module md_interface
                        berendsen_barostat, berendsen_thermostat, &
                        gradient_descent_positions_and_lattice !, gradient_descent_variable_cell_sqnm
 
-   use write_xyz, only: write_extxyz
+   use write_xyz, only: write_extxyz, get_energy_string
 
    use timing, only: time_start, time_end
    use bussi, only: resamplekin
@@ -124,28 +124,7 @@ contains
       instant_pressure = (kB*dfloat(n_sites - 1)*instant_temp &
                           + (virial(1, 1) + virial(2, 2) + virial(3, 3))/3.0_dp)/volume*eVperA3tobar
    end function get_instant_pressure
-   subroutine StripSpaces(string)
-      character(len=*) :: string
-      integer :: stringLen
-      integer :: last, actual
 
-      stringLen = len(string)
-      last = 1
-      actual = 1
-
-      do while (actual < stringLen)
-         if (string(last:last) == ' ') then
-            actual = actual + 1
-            string(last:last) = string(actual:actual)
-            string(actual:actual) = ' '
-         else
-            last = last + 1
-            if (actual < last) &
-               actual = last
-         end if
-      end do
-
-   end subroutine
    subroutine get_formatted_file_strings(n_quantities, write_quantities, quantities,&
         & format_quantities, format_length, string, format_string)
       integer, intent(in)          :: n_quantities
@@ -189,25 +168,9 @@ contains
 
             if (format_length(i) - 1 < 10) then
                write (temp_string, '("(A,1X,A",I1,")")') format_length(i)
-               ! call StripSpaces(temp_string)
-               ! write (temp_string, '(A7)') '(A,1X,A'
-               ! call StripSpaces(temp_string)
-               ! write (temp_string, '(A7,I1)') adjustl(trim(temp_string)), format_length(i)
-               ! call StripSpaces(temp_string)
-               ! write (temp_string, '(A8,A1)') adjustl(trim(temp_string)), ')'
-               ! call StripSpaces(temp_string)
             else
                write (temp_string, '("(A,1X,A",I2,")")') format_length(i)
-               ! call StripSpaces(temp_string)
-               ! write (temp_string, '(A7)') '(A,1X,A'
-               ! call StripSpaces(temp_string)
-               ! write (temp_string, '(A7,I2)') adjustl(trim(temp_string)), format_length(i)
-               ! call StripSpaces(temp_string)
-               ! write (temp_string, '(A9,A1)') adjustl(trim(temp_string)), ')'
-               ! call StripSpaces(temp_string)
-               !write (temp_string, '(A7,I2,A1)') '(A,1X,A', format_length(i), ')'
             end if
-            print *, "temp_string1", temp_string
 
             n_start = len(quantities(i)) - format_length(i) + 1
             n_end = len(quantities(i))
@@ -219,42 +182,26 @@ contains
             n_end = len(format_quantities(i))
 
             n_str = len_trim(adjustl(format_string)) + (n_end - n_start + 1) + 3
-            print *, "n_str", n_str
 
             if (n_str < 10) then
                write (temp_string, '("(A",I1,",A1)")') n_str
                temp_string = adjustl(temp_string)
             else if (n_str < 100) then
                write (temp_string, '("(A",I2,",A1)")') n_str
-               ! write (temp_string, '(A7,I2,A3)') '(A', n_str, 'A1)'
                temp_string = adjustl(temp_string)
             else
-               ! if n_str > 1000
                write (temp_string, '("(A",I3,",A1)")') n_str
-               ! write (temp_string, '(A7,I3,A3)') '(A', n_str, 'A1)'
                temp_string = adjustl(temp_string)
             end if
 
             if (count == n_write) then
-               print *, "format_string_prefinal", format_string
-               print *, "temp_string_prefinal", temp_string
-               print *, "format_quantities(i) (n_start:n_end), ", format_quantities(i) (n_start:n_end)
                write (format_string, temp_string) trim(adjustl(format_string))//'1X,'// &
                   format_quantities(i) (n_start:n_end), ')'
                format_string = adjustl(format_string)
-               print *, "format_string_final", format_string
-               print *, "temp_string_final", temp_string
             else
-               print *, "format_string_prefinal", format_string
-               print *, "temp_string_prefinal", temp_string
-               print *, "format_quantities(i) (n_start:n_end), ", format_quantities(i) (n_start:n_end)
-               print *, trim(adjustl(format_string))//'1X,'// &
-                  format_quantities(i) (n_start:n_end), ','
                write (format_string, temp_string) trim(adjustl(format_string))//'1X,'// &
                   format_quantities(i) (n_start:n_end), ','
                format_string = adjustl(format_string)
-               print *, "format_string_final", format_string
-               print *, "temp_string_final", temp_string
             end if
          end if
       end do
@@ -681,7 +628,7 @@ contains
       character*1024, intent(in) :: format_thermo
       real(dp), intent(in) :: neighbors_buffer
       real(dp), intent(in) :: energy_exp
-      character*1024, intent(in) :: energies_string
+      character*1024, intent(inout) :: energies_string
       character*1024, intent(in) :: local_property_labels(:)
       real(dp), intent(in) :: local_properties(:, :)
 
@@ -994,6 +941,7 @@ contains
          !                            %valid_nd, do_%pair_distribution, do_%structure_factor, do_%xrd, &
          !                            do_%nd, string)
 
+         call get_energy_string(state%energies, energies_string)
          call write_extxyz(file_trajectory, do_, state, md, total, &
                            local_property_labels, local_properties, &
                            energies_string)

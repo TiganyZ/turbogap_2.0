@@ -30,7 +30,7 @@ module write_xyz
 
    use kinds, only: dp
    use control, only: control_t
-   use types, only: state_t, calculation_t
+   use types, only: state_t, calculation_t, energy_t
    use md_types, only: md_t
    use functions
 contains
@@ -66,6 +66,55 @@ contains
 ! If the corresponding write_property(i) or write_array_property(i)
 ! is .true., we write out the corresponding property
 !
+   subroutine get_energy_string(energies, string)
+      type(energy_t), intent(in) :: energies
+      character*1024, intent(out) :: string
+      character*32 :: temp_string
+
+      string = ""
+
+      write (temp_string, "(F16.8)") energies%total
+      write (string, "(A)") adjustl(trim(string))//" energy_total="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%kinetic
+      write (string, "(A)") adjustl(trim(string))//" energy_kinetic="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%gap_soap
+      write (string, "(A)") adjustl(trim(string))//" energy_gap_soap="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%gap_2b
+      write (string, "(A)") adjustl(trim(string))//" energy_gap_2b="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%gap_3b
+      write (string, "(A)") adjustl(trim(string))//" energy_gap_3b="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%gap_core_pot
+      write (string, "(A)") adjustl(trim(string))//" energy_gap_core_pot="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%vdw
+      write (string, "(A)") adjustl(trim(string))//" energy_vdw="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%estat
+      write (string, "(A)") adjustl(trim(string))//" energy_estat="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%exp
+      write (string, "(A)") adjustl(trim(string))//" energy_exp="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%pdf
+      write (string, "(A)") adjustl(trim(string))//" energy_pdf="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%sf
+      write (string, "(A)") adjustl(trim(string))//" energy_sf="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%xrd
+      write (string, "(A)") adjustl(trim(string))//" energy_xrd="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%nd
+      write (string, "(A)") adjustl(trim(string))//" energy_nd="//trim(adjustl(temp_string))
+
+      write (temp_string, "(F16.8)") energies%xps
+      write (string, "(A)") adjustl(trim(string))//" energy_xps="//trim(adjustl(temp_string))
+   end subroutine get_energy_string
 
    subroutine get_xyz_energy_string(energies_soap, energies_2b,&
         & energies_3b, energies_core_pot, energies_vdw, energies_exp&

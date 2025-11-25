@@ -126,7 +126,15 @@ contains
 
          select type (value)
          type is (character(len=*))
-            write (string, '(a20,a3,a)') adjustl(temp), equals, " "//trim(value)
+            if (len_trim(value) > max_length - 24) then
+               write (temp, '(a20,a3)') adjustl(temp), equals
+               call print_line(temp//adjustl(trim(value)), 'normal')
+               return
+            else
+
+               write (string, '(a20,a3,a)') adjustl(temp), equals, " "//trim(value)
+            end if
+
          type is (real(dp))
             if (value < 0.0_dp) then
                !write (temp2, '(g18.6)') value

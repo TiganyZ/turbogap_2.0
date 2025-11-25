@@ -29,7 +29,7 @@
 module misc
    use kinds, only: dp
    use control, only: control_t
-   use types, only: input_parameters, neighbors_t, split_t, energy_t
+   use types, only: input_parameters, neighbors_t, split_t, energy_t, soap_turbo, gap_2b_t, gap_3b_t
    use timer, only: times_t
    use printing, only: print_error, print_parameter, print_separator, print_line, print_message, print_small_message
    use error, only: turbogap_abort
@@ -40,24 +40,36 @@ module misc
 contains
 
                                                    !! FIXME: add more rcut maxes
-   subroutine get_rcut_max(neighbors)
+   subroutine get_rcut_max(neighbors, &
+                           n_gap_soap, gap_soap_hypers, &
+                           n_gap_2b, gap_2b_hypers, &
+                           n_gap_3b, gap_3b_hypers)
+
       type(neighbors_t), intent(inout) :: neighbors
+      integer, intent(in) :: n_gap_soap
+      type(soap_turbo), allocatable, intent(in) :: gap_soap_hypers(:)
+      integer, intent(in) :: n_gap_2b
+      type(gap_2b_t), allocatable, intent(in) :: gap_2b_hypers(:)
+      integer, intent(in) :: n_gap_3b
+      type(gap_3b_t), allocatable, intent(in) :: gap_3b_hypers(:)
 
-      ! !   Check if vdw_rcut is bigger
-      ! if( params%vdw_rcut > rcut_max )then
-      !    rcut_max = params%vdw_rcut
-      ! end if
-      ! if( params%xrd_rcut > rcut_max )then
-      !    rcut_max = params%xrd_rcut
-      ! end if
-      ! if( params%nd_rcut > rcut_max )then
-      !    rcut_max = params%nd_rcut
-      ! end if
-      ! if( params%pair_distribution_rcut > rcut_max )then
-      !    rcut_max = params%pair_distribution_rcut
-      ! end if
+      integer :: i
 
+      do i = 1, n_gap_soap
+         neighbors%rcut_max = max(neighbors%rcut_max, gap_soap_hypers(i)%rcut_max)
+      end do
+
+      do i = 1, n_gap_2b
+         neighbors%rcut_max = max(neighbors%rcut_max, gap_2b_hypers(i)%rcut)
+      end do
+
+      do i = 1, n_gap_3b
+         neighbors%rcut_max = max(neighbors%rcut_max, gap_3b_hypers(i)%rcut)
+      end do
+
+      ! neighbors%rcut_max = max(neighbors%rcut_max, params%core_pot_cutoff + params%core_pot_buffer)
       !   We increase rcut_max by the neighbors buffer
+
       neighbors%rcut_max = neighbors%rcut_max + neighbors%buffer
    end subroutine get_rcut_max
 

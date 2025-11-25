@@ -147,7 +147,8 @@ contains
          allocate (Qss(1:n_sites, 1:n_soap), source=0.0_dp)
          allocate (this_Qss(1:n_soap))
 
-         allocate (Qs_copy(1:n_soap, 1:n_sparse), source=Qs)
+         !allocate (Qs_copy(1:n_soap, 1:n_sparse), source=Qs)
+         allocate (Qs_copy, source=Qs)
 
          if (is_zeta_int) then
             kernels_der = kernels**(zeta_int - 1)
@@ -259,6 +260,7 @@ contains
          !       Loop through distance_2b descriptors
          call time_start(time_2b)
 
+         gap_2b%energies = 0.0_dp
          do i = 1, n_gap_2b
             this_gap_2b%energies = 0.0_dp
             if (do_%forces) then

@@ -228,13 +228,13 @@ contains
 
       !     Collect all energies
       !     NOTE: Why do we reduce here> Don't we reduce after?
-! #ifdef _MPIF90
+#ifdef _MPIF90
 
-!       call time_start(time_mpi)
-!    call mpi_reduce(gap_soap%energies, this_gap_soap%energies, state%n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-!       call time_end(time_mpi)
-!       gap_soap%energies = this_gap_soap%energies
-! #endif
+      call time_start(time_mpi)
+   call mpi_reduce(gap_soap%energies, this_gap_soap%energies, state%n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      call time_end(time_mpi)
+      gap_soap%energies = this_gap_soap%energies
+#endif
 
       do i = 1, n_soap
          !       Compute number of pairs for this SOAP. SOAP has in general a different cutoff than overall max

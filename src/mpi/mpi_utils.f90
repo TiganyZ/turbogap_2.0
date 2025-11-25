@@ -513,6 +513,8 @@ contains
       real(dp), intent(out) :: energy
       integer :: ierr
 
+      energy = 0.0_dp
+
 #ifdef _MPIF90
       call mpi_reduce(calc%energies, this_calc%energies, &
                       n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)

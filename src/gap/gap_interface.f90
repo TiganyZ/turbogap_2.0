@@ -37,23 +37,74 @@ module gap_interface
    use printing, only: print_parameter
 contains
 
-!**************************************************************************
-   subroutine get_gap_soap(n_total_sites, n_sites0, n_neigh0, neighbors_list0, n_species, species_types, &
-                           rjs0, thetas0, phis0, xyz0, alpha_max, l_max, n_soap, &
-                           rcut_hard, rcut_soft, nf, global_scaling, atom_sigma_r, &
-                           atom_sigma_r_scaling, atom_sigma_t, atom_sigma_t_scaling, &
-                           amplitude_scaling, radial_enhancement, central_weight, basis, &
-                           scaling_mode, do_timing, do_derivatives, do_forces, do_prediction, &
-                           write_soap, write_derivatives, compress_soap, &
-                           compress_P_nonzero, compress_P_i, compress_P_j, compress_P_el, &
-                           delta, zeta, central_species, &
-                           xyz_species, xyz_species_supercell, alphas, Qs, all_atoms, &
-                           which_atom, indices, soap, soap_cart_der, der_neighbors, der_neighbors_list, &
-                           has_local_properties, n_local_properties, local_property_models, &
-                           energies0, forces0, local_properties0, &
+   !**************************************************************************
+   subroutine get_gap_soap(n_total_sites, &
+                           n_sites0, &
+                           n_neigh0, &
+                           neighbors_list0, &
+                           n_species, &
+                           species_types, &
+                           rjs0, &
+                           thetas0, &
+                           phis0, &
+                           xyz0, &
+                           alpha_max, &
+                           l_max, &
+                           n_soap, &
+                           rcut_hard, &
+                           rcut_soft, &
+                           nf, &
+                           global_scaling, &
+                           atom_sigma_r, &
+                           atom_sigma_r_scaling, &
+                           atom_sigma_t, &
+                           atom_sigma_t_scaling, &
+                           amplitude_scaling, &
+                           radial_enhancement, &
+                           central_weight, &
+                           basis, &
+                           scaling_mode, &
+                           do_timing, &
+                           do_derivatives, &
+                           do_forces, &
+                           do_prediction, &
+                           write_soap, &
+                           write_derivatives, &
+                           compress_soap, &
+                           compress_P_nonzero, &
+                           compress_P_i, &
+                           compress_P_j, &
+                           compress_P_el, &
+                           delta, &
+                           zeta, &
+                           central_species, &
+                           xyz_species, &
+                           xyz_species_supercell, &
+                           alphas, &
+                           Qs, &
+                           all_atoms, &
+                           which_atom, &
+                           indices, &
+                           soap, &
+                           soap_cart_der, &
+                           der_neighbors, &
+                           der_neighbors_list, &
+                           has_local_properties, &
+                           n_local_properties, &
+                           local_property_models, &
+                           energies0, &
+                           forces0, &
+                           local_properties0, &
                            local_properties_cart_der0, &
-                           local_property_indexes, this_i_beg, this_i_end, this_j_beg, &
-                           this_j_end, virial, lp_index, time_soap, time_local_properties)
+                           local_property_indexes, &
+                           this_i_beg, &
+                           this_i_end, &
+                           this_j_beg, &
+                           this_j_end, &
+                           virial, &
+                           lp_index, &
+                           time_soap, &
+                           time_local_properties)
 
       implicit none
 

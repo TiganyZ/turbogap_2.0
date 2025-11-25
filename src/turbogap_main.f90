@@ -77,7 +77,7 @@ module turbogap_main
    use read_gap, only: read_gap_hypers
 
                                                                       !! Writing
-   use write_xyz, only: write_extxyz
+   use write_xyz, only: write_extxyz, get_energy_string
 
    !
    !, &
@@ -279,6 +279,9 @@ contains
 
       character*1024 :: energies_string = ""
 
+      real(dp) :: neighbors_rcut_max
+      real(dp) :: neighbors_rcut_buffer
+
       real(dp) :: seed
 
       !*************************************************************************
@@ -385,7 +388,11 @@ contains
       call time_end(time%io)
 
       ! FIXME: Will add more types in here for the other rcut maxes later
-      call get_rcut_max(neighbors)
+      !
+      call get_rcut_max(neighbors, &
+                        n_gap_soap, gap_soap_hypers, &
+                        n_gap_2b, gap_2b_hypers, &
+                        n_gap_3b, gap_3b_hypers)
 
       if (rank == 0) &
          call print_parameter("rcut_max", neighbors%rcut_max)
@@ -469,15 +476,23 @@ contains
          if (perform%mc_step) &
             mc%i_step = mc%i_step + 1
 
-         perform%neighbors = do_%rebuild_neighbors_list
+         perform%neighbors = do_%rebuild_neighbors_list .or. do_%repeat_xyz
 
-         perform%reallocate = (state%n_sites /= state%n_sites_prev)
-         perform%broadcast = (state%n_sites /= state%n_sites_prev)
+         perform%reallocate = (state%n_sites /= state%n_sites_prev .or. do_%repeat_xyz)
+         perform%broadcast = (state%n_sites /= state%n_sites_prev .or. do_%repeat_xyz)
 
          perform%read_xyz = decide_read_xyz(do_, md%i_step, mc%i_step)
 
          perform%write_xyz = decide_write_xyz(do_, md, mc, rank)
          perform%write_thermo = decide_write_thermo(do_, md, rank)
+
+         if (do_%only_prediction) then
+            do_%rebuild_neighbors_list = .true.
+            perform%neighbors = do_%rebuild_neighbors_list .or. do_%repeat_xyz
+            do_%supercell_check_only = .false.
+            do_%recalculate_supercell = .false.
+            perform%read_xyz = perform%read_xyz .or. do_%repeat_xyz
+         end if
 
          ! call print_parameter(" perform md_step ", perform%md_step)
          ! call print_parameter(" perform mc_step ", perform%mc_step)
@@ -824,15 +839,19 @@ contains
 #ifdef _MPIF90
          call time_start(time%mpi)
 
+         if (perform%gap_soap) &
          call collect_calculation(do_%forces, state%n_sites, gap_soap,&
               & this_gap_soap, state%energies%gap_soap)
 
+         if (perform%gap_2b) &
          call collect_calculation(do_%forces, state%n_sites, gap_2b,&
               & this_gap_2b, state%energies%gap_2b)
 
+         if (perform%gap_3b) &
          call collect_calculation(do_%forces, state%n_sites, gap_3b,&
               & this_gap_3b, state%energies%gap_3b)
 
+         if (perform%gap_core_pot) &
          call collect_calculation(do_%forces, state%n_sites, gap_core_pot,&
               & this_gap_core_pot, state%energies%gap_core_pot)
 
@@ -906,6 +925,7 @@ contains
                call time_start(time%writing)
 
                call wrap_pbc(state)
+               call get_energy_string(state%energies, energies_string)
                call write_extxyz(file_trajectory, do_, state, md, total, &
                                  local_property_labels, local_properties, &
                                  energies_string)
@@ -1063,8 +1083,14 @@ contains
          state%n_sites_prev = state%n_sites
          neighbors%n_atom_pairs_prev = neighbors%n_atom_pairs
 
-         if (do_%rebuild_neighbors_list) &
+         if (do_%rebuild_neighbors_list) then
+            neighbors_rcut_max = neighbors%rcut_max
+            neighbors_rcut_buffer = neighbors%buffer
             call deallocate_neighbors(neighbors)
+
+            neighbors%rcut_max = neighbors_rcut_max
+            neighbors%buffer = neighbors_rcut_buffer
+         end if
 
       end do main_loop
 

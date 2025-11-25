@@ -38,7 +38,7 @@ module mc_interface
 
    use state_interface, only: reallocate_state, reallocate_state_out, print_state, reset_state
    use mc_utils
-   use write_xyz, only: write_extxyz
+   use write_xyz, only: write_extxyz, get_energy_string
 
    implicit none
 
@@ -312,6 +312,7 @@ contains
          md_fake%i_step = mc%i_step
 
          energies_string = ""
+         call get_energy_string(state%energies, energies_string)
          call write_extxyz(file_mc, do_, state, md_fake, total, &
                            local_property_labels, state%local_properties, &
                            energies_string)
