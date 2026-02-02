@@ -50,7 +50,7 @@ module types
       real(dp)                 :: max_GBytes_per_process = 1.0_dp
 
                                                             !! Neighbors buffers
-      real(dp)                 :: core_pot_cutoff = 1.0_dp
+      real(dp)                 :: core_pot_cutoff = 1.0d10
       real(dp)                 :: core_pot_buffer = 0.0_dp
 
                                    !! Number of local properties for convenience

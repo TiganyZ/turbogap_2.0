@@ -771,7 +771,7 @@ contains
                                                                      !! core_pot
 
          if (perform%gap_core_pot) then
-            call calculate_gap_core_pot(neighbors, n_gap_core_pot, &
+            call calculate_gap_core_pot(state%n_sites, neighbors, n_gap_core_pot, &
                                         gap_core_pot_hypers, do_, species_info, state%species, split, &
                                         gap_core_pot, this_gap_core_pot, time%gap_core_pot)
          end if
@@ -913,6 +913,11 @@ contains
             if (perform%gap_core_pot) then
                total%forces = total%forces + gap_core_pot%forces
                total%virial = total%virial + gap_core_pot%virial
+            end if
+
+            if (perform%vdw) then
+               total%forces = total%forces + vdw%forces
+               total%virial = total%virial + vdw%virial
             end if
 
             ! if (rank == 0) then

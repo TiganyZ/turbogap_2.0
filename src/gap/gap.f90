@@ -459,7 +459,7 @@ contains
 
    end subroutine
 
-   subroutine calculate_gap_core_pot(neighbors, n_gap_core_pot, gap_core_pot_hypers, do_, &
+   subroutine calculate_gap_core_pot(n_sites, neighbors, n_gap_core_pot, gap_core_pot_hypers, do_, &
                                      species_info, species, split, gap_core_pot, this_gap_core_pot, time_core_pot)
       type(neighbors_t), intent(in)      :: neighbors
       integer, intent(in)                :: n_gap_core_pot
@@ -472,6 +472,12 @@ contains
       type(calculation_t), intent(inout) :: this_gap_core_pot
       real(dp), intent(inout)            :: time_core_pot(3)
       integer                            :: i
+      integer, intent(in) :: n_sites
+      integer             :: n_sites_local
+      integer             :: n_pairs_local
+
+      n_sites_local = split%i_end - split%i_beg + 1
+      n_pairs_local = split%j_end - split%j_beg + 1
 
       if (do_%prediction) then
          !       Loop through distance_2b descriptors
@@ -484,6 +490,8 @@ contains
                this_gap_core_pot%virial = 0.0_dp
 
                call get_core_pot_energy_and_forces( &
+                  size(gap_core_pot_hypers(i)%x), &
+                  n_sites_local, n_pairs_local, n_sites, &
                   neighbors%rjs(split%j_beg:split%j_end), &
                   neighbors%xyz(1:3, split%j_beg:split%j_end), &
                   gap_core_pot_hypers(i)%x, &
@@ -506,6 +514,8 @@ contains
             else
 
                call get_core_pot_energy_and_forces( &
+                  size(gap_core_pot_hypers(i)%x), &
+                  n_sites_local, n_pairs_local, n_sites, &
                   neighbors%rjs(split%j_beg:split%j_end), &
                   neighbors%xyz(1:3, split%j_beg:split%j_end), &
                   gap_core_pot_hypers(i)%x, &
@@ -539,7 +549,8 @@ contains
       end if
    end subroutine calculate_gap_core_pot
 
-   subroutine get_core_pot_energy_and_forces(rjs, xyz, x, V, yp1, ypn, dVdx2, n_neigh, do_forces, do_timing, species, &
+   subroutine get_core_pot_energy_and_forces(n_sparse, n_sites, n_atom_pairs, n_sites0, &
+                                             rjs, xyz, x, V, yp1, ypn, dVdx2, n_neigh, do_forces, do_timing, species, &
                                              neighbor_species, species1, species2, species_types, energies, forces, &
                                              virial)
 
@@ -562,16 +573,21 @@ contains
       real(dp) :: V_int(1:1), dV_int(1:1), this_force(1:3)
 !    real(dp), allocatable :: V_int(:), dV_int(:)
       real(dp) :: time1, time2, rcut
-      integer :: n_sparse, i, j, k, n_sites, n_atom_pairs, s, sp1, sp2, n_sites0, k1, k2
+      integer :: i, j, k, s, sp1, sp2, k1, k2
+
+      integer, intent(in) :: n_sparse
+      integer, intent(in) :: n_sites
+      integer, intent(in) :: n_atom_pairs
+      integer, intent(in) :: n_sites0
 
       if (do_timing) then
          call cpu_time(time1)
       end if
 
-      n_sparse = size(x)
-      n_sites = size(n_neigh)
-      n_atom_pairs = size(rjs)
-      n_sites0 = size(forces, 2)
+      ! n_sparse = size(x)
+      ! n_sites = size(n_neigh)
+      ! n_atom_pairs = size(rjs)
+      ! n_sites0 = size(forces, 2)
 
       rcut = maxval(x)
 
