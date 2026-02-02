@@ -344,6 +344,9 @@ contains
             if (soap_turbo_hypers(i)%has_local_properties) then
 
                local_properties = local_properties + this_local_properties
+
+!               print *, soap_turbo_hypers(i)%local_property_models(1)%do_derivatives
+
                if (any(soap_turbo_hypers(i)%local_property_models(:) &
                        %do_derivatives) .and. do_%derivatives) then
                   local_properties_cart_der = local_properties_cart_der + &

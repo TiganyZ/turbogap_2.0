@@ -28,8 +28,6 @@
 
 module read_vdw
    use vdw_types, only: options_vdw_t
-   use printing, only: print_error
-   use read_utils
    use printing, only: print_error, print_parameter, print_parameters, print_separator
    use error, only: turbogap_abort
    use read_utils
@@ -58,108 +56,108 @@ contains
       type(options_vdw_t), intent(inout) :: options_vdw
 
       !   Let's allocate some arrays:
-      if (.not. allocated(options_vdw%vdw_c6_ref)) then
-         allocate (options_vdw%vdw_c6_ref(1:n_species))
-         allocate (options_vdw%vdw_r0_ref(1:n_species))
-         allocate (options_vdw%vdw_alpha0_ref(1:n_species))
+      if (.not. allocated(options_vdw%c6_ref)) then
+         allocate (options_vdw%c6_ref(1:n_species))
+         allocate (options_vdw%r0_ref(1:n_species))
+         allocate (options_vdw%alpha0_ref(1:n_species))
 
          !   Some defaults before reading from file
-         options_vdw%vdw_c6_ref = 0.d0
-         options_vdw%vdw_r0_ref = 0.d0
-         options_vdw%vdw_alpha0_ref = 0.d0
+         options_vdw%c6_ref = 0.d0
+         options_vdw%r0_ref = 0.d0
+         options_vdw%alpha0_ref = 0.d0
          options_vdw%are_vdw_refs_read = .false.
       end if
 
       if (keyword == "vdw_type") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_type
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%type
          if (rank == 0) &
-            call print_parameter("vdw_type", options_vdw%vdw_type)
+            call print_parameter("vdw_type", options_vdw%type)
          keyword_found = .true.
-         call upper_to_lower_case(options_vdw%vdw_type)
-         if (options_vdw%vdw_type == "ts") then
+         call upper_to_lower_case(options_vdw%type)
+         if (options_vdw%type == "ts") then
             continue
-         else if (options_vdw%vdw_type == "none") then
+         else if (options_vdw%type == "none") then
             continue
          else
-            write (*, *) "ERROR: I do not recognize the vdw_type keyword ", options_vdw%vdw_type
+            write (*, *) "ERROR: I do not recognize the vdw_type keyword ", options_vdw%type
             stop
          end if
       else if (keyword == "vdw_sr") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_sr
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%sr
          if (rank == 0) &
-            call print_parameter("vdw_sr", options_vdw%vdw_sr)
+            call print_parameter("vdw_sr", options_vdw%sr)
          keyword_found = .true.
       else if (keyword == "vdw_d") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_d
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%d
          if (rank == 0) &
-            call print_parameter("vdw_d", options_vdw%vdw_d)
+            call print_parameter("vdw_d", options_vdw%d)
          keyword_found = .true.
       else if (keyword == "vdw_rcut") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_rcut
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%rcut
          if (rank == 0) &
-            call print_parameter("vdw_rcut", options_vdw%vdw_rcut, 'A')
+            call print_parameter("vdw_rcut", options_vdw%rcut, 'A')
          keyword_found = .true.
       else if (keyword == "vdw_buffer") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_buffer
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%buffer
          if (rank == 0) &
-            call print_parameter("vdw_buffer", options_vdw%vdw_buffer)
+            call print_parameter("vdw_buffer", options_vdw%buffer)
          keyword_found = .true.
       else if (keyword == "vdw_rcut_inner") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_rcut_inner
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%rcut_inner
          if (rank == 0) &
-            call print_parameter("vdw_rcut_inner", options_vdw%vdw_rcut_inner)
+            call print_parameter("vdw_rcut_inner", options_vdw%rcut_inner)
          keyword_found = .true.
       else if (keyword == "vdw_buffer_inner") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_buffer_inner
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%buffer_inner
          if (rank == 0) &
-            call print_parameter("vdw_buffer_inner", options_vdw%vdw_buffer_inner)
+            call print_parameter("vdw_buffer_inner", options_vdw%buffer_inner)
          keyword_found = .true.
       else if (keyword == "vdw_c6_ref") then
          backspace (input)
-         call read_parameters(input, iostatus, n_species, options_vdw%vdw_c6_ref)
+         call read_parameters(input, iostatus, n_species, options_vdw%c6_ref)
          if (rank == 0) &
-            call print_parameters("vdw_c6_ref", options_vdw%vdw_c6_ref)
+            call print_parameters("vdw_c6_ref", options_vdw%c6_ref)
          keyword_found = .true.
          options_vdw%are_vdw_refs_read(1) = .true.
          options_vdw%are_vdw_refs_read(1) = .true.
       else if (keyword == "vdw_r0_ref") then
          backspace (input)
-         call read_parameters(input, iostatus, n_species, options_vdw%vdw_r0_ref)
+         call read_parameters(input, iostatus, n_species, options_vdw%r0_ref)
          if (rank == 0) &
-            call print_parameters("vdw_r0_ref", options_vdw%vdw_r0_ref)
+            call print_parameters("vdw_r0_ref", options_vdw%r0_ref)
          keyword_found = .true.
          options_vdw%are_vdw_refs_read(2) = .true.
       else if (keyword == "vdw_alpha0_ref") then
          backspace (input)
-         call read_parameters(input, iostatus, n_species, options_vdw%vdw_alpha0_ref)
+         call read_parameters(input, iostatus, n_species, options_vdw%alpha0_ref)
          if (rank == 0) &
-            call print_parameters("vdw_alpha0_ref", options_vdw%vdw_alpha0_ref)
+            call print_parameters("vdw_alpha0_ref", options_vdw%alpha0_ref)
          keyword_found = .true.
          options_vdw%are_vdw_refs_read(3) = .true.
       else if (keyword == "vdw_scs_rcut") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_scs_rcut
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%scs_rcut
          if (rank == 0) &
-            call print_parameter("vdw_scs_rcut", options_vdw%vdw_scs_rcut)
+            call print_parameter("vdw_scs_rcut", options_vdw%scs_rcut)
          keyword_found = .true.
       else if (keyword == "vdw_mbd_nfreq") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_mbd_nfreq
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%mbd_nfreq
          if (rank == 0) &
-            call print_parameter("vdw_mbd_nfreq", options_vdw%vdw_mbd_nfreq)
+            call print_parameter("vdw_mbd_nfreq", options_vdw%mbd_nfreq)
          keyword_found = .true.
       else if (keyword == "vdw_mbd_grad") then
          backspace (input)
-         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%vdw_mbd_grad
+         read (input, *, iostat=iostatus) cjunk, cjunk, options_vdw%mbd_grad
          if (rank == 0) &
-            call print_parameter("vdw_mbd_grad", options_vdw%vdw_mbd_grad)
+            call print_parameter("vdw_mbd_grad", options_vdw%mbd_grad)
          keyword_found = .true.
       end if
 
@@ -178,24 +176,24 @@ contains
       do i = 1, n_species
          call get_vdw_ref_params(species_types(i), c6_ref, r0_ref, alpha0_ref, rank)
          if (.not. options_vdw%are_vdw_refs_read(1)) then
-            options_vdw%vdw_c6_ref(i) = c6_ref
+            options_vdw%c6_ref(i) = c6_ref
          end if
          if (.not. options_vdw%are_vdw_refs_read(2)) then
-            options_vdw%vdw_r0_ref(i) = r0_ref
+            options_vdw%r0_ref(i) = r0_ref
          end if
          if (.not. options_vdw%are_vdw_refs_read(3)) then
-            options_vdw%vdw_alpha0_ref(i) = alpha0_ref
+            options_vdw%alpha0_ref(i) = alpha0_ref
          end if
       end do
 
 !   If we don't use van der Waals, then unset the default cutoff
-      if (options_vdw%vdw_type == "none") then
-         options_vdw%vdw_rcut = 0.d0
+      if (options_vdw%type == "none") then
+         options_vdw%rcut = 0.d0
       else
 !     If van der Waals is enabled, make sure the inner and outer cutoff regions do not overlap
 !     and other sanity checks
-         if (options_vdw%vdw_rcut - options_vdw%vdw_buffer < options_vdw &
-             %vdw_rcut_inner + options_vdw%vdw_buffer_inner) then
+         if (options_vdw%rcut - options_vdw%buffer < options_vdw &
+             %rcut_inner + options_vdw%buffer_inner) then
             write (*, *) "ERROR: vdW inner and outer cutoff regions can't&
                  & overlap. Check your vdw_* definitions"
             call turbogap_abort()

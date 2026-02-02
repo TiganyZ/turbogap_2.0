@@ -89,6 +89,8 @@ module turbogap_main
    use calculate_gap_soap_mod, only: calculate_gap_soap, reset_local_properties
    use gap, only: calculate_gap_2b, calculate_gap_3b, calculate_gap_core_pot
 
+   use vdw_interface, only: get_vdw_energy_and_forces
+
 #ifdef _MPIF90
    use mpi
    use mpi_utils, only: collect_calculation, broadcast_md, broadcast_mc, broadcast_state, synchronize_state
@@ -392,7 +394,7 @@ contains
       call get_rcut_max(neighbors, &
                         n_gap_soap, gap_soap_hypers, &
                         n_gap_2b, gap_2b_hypers, &
-                        n_gap_3b, gap_3b_hypers)
+                        n_gap_3b, gap_3b_hypers, options_vdw)
 
       if (rank == 0) &
          call print_parameter("rcut_max", neighbors%rcut_max)
@@ -436,6 +438,8 @@ contains
 
       if (perform%gap_soap) &
          perform%local_properties = any(gap_soap_hypers(:)%has_local_properties)
+
+      perform%vdw = (trim(options_vdw%type) == "ts" .and. options_vdw%valid)
 
       !! Decide whether to do experimental options
       perform%pdf = do_%pdf
@@ -781,6 +785,11 @@ contains
 
          !*************************************************************************
                                                                           !! vdw
+         if (perform%vdw) then
+            call get_vdw_energy_and_forces(state, species_info, this_vdw, vdw, options_vdw, &
+                                           neighbors, local_properties_cart_der, lp_indexes, split, do_, &
+                                           time%vdw)
+         end if
 
 #ifdef _DEBUG
          call print_debug("Finished vdw ", "turbogap_main.f90", rank)
@@ -855,6 +864,10 @@ contains
          call collect_calculation(do_%forces, state%n_sites, gap_core_pot,&
               & this_gap_core_pot, state%energies%gap_core_pot)
 
+         if (perform%vdw) &
+         call collect_calculation(do_%forces, state%n_sites, vdw,&
+              & this_vdw, state%energies%vdw)
+
          call time_end(time%mpi)
 
          if (perform%gap_soap) then
@@ -871,6 +884,10 @@ contains
 
          if (perform%gap_core_pot) then
             total%energies = total%energies + gap_core_pot%energies
+         end if
+
+         if (perform%vdw) then
+            total%energies = total%energies + vdw%energies
          end if
 
          state%energy = sum(total%energies)

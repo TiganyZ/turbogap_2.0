@@ -78,6 +78,8 @@ SRC := kinds.f90 \
        gap_interface.f90 \
        calculate_gap_soap.f90 \
        \
+       vdw_interface.f90 \
+       \
        \
        mpi_utils.f90 \
        \

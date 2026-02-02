@@ -35,6 +35,7 @@ module misc
    use error, only: turbogap_abort
    use md_interface, only: initialize_thermo_file
    use mc_utils, only: initialize_mc_log_file
+   use vdw_types, only: options_vdw_t
    implicit none
 
 contains
@@ -43,7 +44,8 @@ contains
    subroutine get_rcut_max(neighbors, &
                            n_gap_soap, gap_soap_hypers, &
                            n_gap_2b, gap_2b_hypers, &
-                           n_gap_3b, gap_3b_hypers)
+                           n_gap_3b, gap_3b_hypers, &
+                           options_vdw)
 
       type(neighbors_t), intent(inout) :: neighbors
       integer, intent(in) :: n_gap_soap
@@ -52,10 +54,13 @@ contains
       type(gap_2b_t), allocatable, intent(in) :: gap_2b_hypers(:)
       integer, intent(in) :: n_gap_3b
       type(gap_3b_t), allocatable, intent(in) :: gap_3b_hypers(:)
+      type(options_vdw_t), intent(in) :: options_vdw
 
       integer :: i
 
+      ! print *, " neighbors%rcut_max first", neighbors%rcut_max
       do i = 1, n_gap_soap
+         ! print *, " gap_soap_hypers(i)%rcut_max ", gap_soap_hypers(i)%rcut_max
          neighbors%rcut_max = max(neighbors%rcut_max, gap_soap_hypers(i)%rcut_max)
       end do
 
@@ -67,10 +72,14 @@ contains
          neighbors%rcut_max = max(neighbors%rcut_max, gap_3b_hypers(i)%rcut)
       end do
 
+      neighbors%rcut_max = max(neighbors%rcut_max, options_vdw%rcut)
+
+      ! print *, " neighbors%rcut_max last", neighbors%rcut_max
       ! neighbors%rcut_max = max(neighbors%rcut_max, params%core_pot_cutoff + params%core_pot_buffer)
       !   We increase rcut_max by the neighbors buffer
 
       neighbors%rcut_max = neighbors%rcut_max + neighbors%buffer
+
    end subroutine get_rcut_max
 
    !*************************************************************************

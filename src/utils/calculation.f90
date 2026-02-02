@@ -185,6 +185,11 @@ contains
          call allocate_calculation(n_sites, this_gap_core_pot, do_forces)
       end if
 
+      if (perform%vdw) then
+         call allocate_calculation(n_sites, vdw, do_forces)
+         call allocate_calculation(n_sites, this_vdw, do_forces)
+      end if
+
       !! Allocate Experimental Calculations
       if (perform%pdf) &
          call allocate_calculation(n_sites, pdf, do_forces)

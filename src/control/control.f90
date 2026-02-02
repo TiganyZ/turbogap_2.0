@@ -55,6 +55,8 @@ module control
 
       logical :: local_properties = .false.
 
+      logical :: vdw = .false.
+
                                                          !! Experimental options
       logical :: exp = .false.
 

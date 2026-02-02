@@ -32,21 +32,21 @@ module vdw_types
 
    type options_vdw_t
       logical               :: valid = .false.
-      real(dp), allocatable :: vdw_c6_ref(:)
-      real(dp), allocatable :: vdw_r0_ref(:)
-      real(dp), allocatable :: vdw_alpha0_ref(:)
+      real(dp), allocatable :: c6_ref(:)
+      real(dp), allocatable :: r0_ref(:)
+      real(dp), allocatable :: alpha0_ref(:)
       logical               :: are_vdw_refs_read(3) = .false.
-      real(dp)              :: vdw_sr = 0.94_dp
-      real(dp)              :: vdw_d = 20.0_dp
-      real(dp)              :: vdw_rcut = 10.0_dp
-      real(dp)              :: vdw_buffer = 1.0_dp
-      real(dp)              :: vdw_rcut_inner = 0.5_dp
-      real(dp)              :: vdw_buffer_inner = 0.5_dp
-      real(dp)              :: vdw_scs_rcut = 4.0_dp
-      integer               :: vdw_mbd_nfreq = 11
-      character*32          :: vdw_type = "none"
-      logical               :: vdw_mbd_grad = .false.
-      logical               :: vdw_forces = .true.
+      real(dp)              :: sr = 0.94_dp
+      real(dp)              :: d = 20.0_dp
+      real(dp)              :: rcut = 10.0_dp
+      real(dp)              :: buffer = 1.0_dp
+      real(dp)              :: rcut_inner = 0.5_dp
+      real(dp)              :: buffer_inner = 0.5_dp
+      real(dp)              :: scs_rcut = 4.0_dp
+      integer               :: mbd_nfreq = 11
+      character*32          :: type = "none"
+      logical               :: mbd_grad = .false.
+      logical               :: forces = .true.
    end type options_vdw_t
 
 end module vdw_types

@@ -397,15 +397,15 @@ contains
                   if (trim(mc%relax_after(i)) == trim(mc%types(j))) then
                      check = .false.
                   end if
-                  if (check) then
-                     if (rank == 0) then
-                        call print_error("The MC move "//mc%relax_after(i)//" in&
-                        & mc_relax_after does not match any of the mc_types."&
-                        & )
-                        call turbogap_abort()
-                     end if
-                  end if
                end do
+               if (check) then
+                  if (rank == 0) then
+                     call print_error("The MC move "//mc%relax_after(i)//" in&
+                     & mc_relax_after does not match any of the mc_types."&
+                     & )
+                     call turbogap_abort()
+                  end if
+               end if
             end do
 
             if (rank == 0) &

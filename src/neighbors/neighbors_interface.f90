@@ -33,6 +33,7 @@ module neighbors_interface
    use timing, only: time_start, time_end
    use printing, only: print_debug, print_parameter
    use mpi
+   ! use tg_memory, only: tg_allocate, tg_deallocate
    implicit none
 
 contains
@@ -43,6 +44,33 @@ contains
 !
    subroutine deallocate_neighbors(neighbors)
       type(neighbors_t), intent(out) :: neighbors
+
+      ! call tg_deallocate( neighbors%rjs                       , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "rjs" )
+      ! call tg_deallocate( neighbors%phis                      , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "phis" )
+      ! call tg_deallocate( neighbors%thetas                    , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "thetas" )
+      ! call tg_deallocate( neighbors%xyz                       , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "xyz" )
+      ! call tg_deallocate( neighbors%n_neigh                   , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "n_neigh" )
+      ! call tg_deallocate( neighbors%n_neigh_global            , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "n_neigh_global" )
+      ! call tg_deallocate( neighbors%neighbor_species          , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "neighbor_species" )
+      ! call tg_deallocate( neighbors%neighbors_list            , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "neighbors_list" )
+      ! call tg_deallocate( neighbors%neighbors_list_temp       , neighbors &
+      !      &%memory%total, neighbors%memory%max, rank, "neighbors_list_temp" )
+      ! call tg_deallocate( neighbors%n_atom_pairs_by_rank      , neighbors&
+      !      &%memory%total, neighbors%memory%max, rank, "n_atom_pairs_by_rank" )
+      ! call tg_deallocate( neighbors%n_atom_pairs_by_rank_prev , neighbors&
+      !      &%memory%total, neighbors%memory%max, rank,&
+      !      & "n_atom_pairs_by_rank_prev" )
+      ! call tg_deallocate( neighbors%do_list                   , neighbors&
+      !      &%memory%total, neighbors%memory%max, rank, "do_list" )
+
    end subroutine deallocate_neighbors
 !
 
@@ -230,6 +258,11 @@ contains
          mx = int(state%a_box(1)/neighbors%rcut_max)
          my = int(state%b_box(2)/neighbors%rcut_max)
          mz = int(state%c_box(3)/neighbors%rcut_max)
+
+         ! print *, "mx", mx
+         ! print *, "my", my
+         ! print *, "mz", mz
+         ! print *, "neighbors%rcut_max", neighbors%rcut_max
          allocate (head(1:mx*my*mz))
          head = 0
          allocate (this_list(1:state%n_sites))
@@ -240,10 +273,18 @@ contains
                  & .true., .true./), dist, d, i_shift)
             !       This is the position within the supercell, we must make sure
             !       it really is within the supercell
+            ! print *, "dist 1", dist
             dist = dist + [state%a_box(1)/2.d0, state%b_box(2)/2.d0, state%c_box(3)/2.d0]
             j = 1 + modulo(int(dist(1)/(state%a_box(1) + tol)*mx), mx) &
                 + modulo(int(dist(2)/(state%b_box(2) + tol)*my), my)*mx &
                 + modulo(int(dist(3)/(state%c_box(3) + tol)*mz), mz)*my*mx
+            ! print *, state%a_box
+            ! print *, state%b_box
+            ! print *, state%c_box
+            ! print *, "dist 2", dist
+            ! print *, "i, j", i, j
+            ! print *, " head(j)", head(j)
+            ! print *, " this_list(i)", this_list(i)
             this_list(i) = head(j)
             head(j) = i
          end do

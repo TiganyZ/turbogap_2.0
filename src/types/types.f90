@@ -73,6 +73,11 @@ module types
       logical                  :: masses_from_xyz = .false.
    end type species_info_t
 
+   type memory_t
+      real(dp) :: max = 0.0_dp
+      real(dp) :: total = 0.0_dp
+   end type memory_t
+
    type neighbors_t
                                                          !! Neighbor information
       integer :: n_neigh_max = 100
@@ -97,6 +102,7 @@ module types
       integer, allocatable  :: n_atom_pairs_by_rank(:)
       integer, allocatable  :: n_atom_pairs_by_rank_prev(:)
       logical, allocatable  :: do_list(:)
+      type(memory_t) :: memory
    end type neighbors_t
 
                               !! Container type for all energies for convenience
@@ -210,11 +216,6 @@ module types
       real(dp) :: p_beg = 100.0_dp
       real(dp) :: p_end = 100.0_dp
    end type thermo_t
-
-   type memory_t
-      real(dp) :: cpu = 0.0_dp
-      real(dp) :: gpu = 0.0_dp
-   end type memory_t
 
                                                          !! End of General types
    !****************************************************************************
