@@ -103,8 +103,8 @@ contains
     logical, intent(in) :: allocated_velocities
     logical :: decision
 
-    decision = ( do_md .and. md_randomize_velocities .and. &
-         (md_i_step == 0) .and. allocated_velocities )
+    decision = ( ( do_md .and. (md_i_step == 0) .and. md_randomize_velocities  ) &
+         .or. ( do_md .and. (md_i_step == 0) .and. (.not. allocated_velocities ) ) )
 
   end function decide_randomize_velocities
 

@@ -30,7 +30,7 @@ module vdw_types
    use kinds, only: dp
    implicit none
 
-   type options_vdw_t
+   type vdw_t
       logical               :: valid = .false.
       real(dp), allocatable :: c6_ref(:)
       real(dp), allocatable :: r0_ref(:)
@@ -47,6 +47,6 @@ module vdw_types
       character*32          :: type = "none"
       logical               :: mbd_grad = .false.
       logical               :: forces = .true.
-   end type options_vdw_t
+   end type vdw_t
 
 end module vdw_types

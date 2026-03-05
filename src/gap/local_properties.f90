@@ -31,7 +31,7 @@ module local_prop
    use control, only: control_t
    use types, only: soap_turbo
    use exp_types, only: exp_data_t, exp_indexes_t, xps_t
-   use vdw_types, only: options_vdw_t
+   use vdw_types, only: vdw_t
    use printing, only: print_message, print_error, print_parameter, print_parameters
    implicit none
 
@@ -174,7 +174,7 @@ contains
       type(lp_indexes_t), intent(inout)            :: lp_indexes
 
       type(xps_t), intent(inout)                   :: options_xps
-      type(options_vdw_t), intent(inout)                   :: options_vdw
+      type(vdw_t), intent(inout)                   :: options_vdw
 
       character*1024, allocatable, intent(inout)   :: local_property_labels(:)
       integer, allocatable, intent(inout)          :: local_property_indexes(:)
@@ -305,7 +305,7 @@ contains
 
       end if
 
-    end subroutine check_local_properties
+   end subroutine check_local_properties
 
    subroutine check_local_property(property_name, property_index, valid_property, &
                                    i, j, n_soap_turbo, soap_turbo_hypers, do_, local_property_labels)

@@ -45,7 +45,7 @@ module read_files
    use md_types, only: md_t
    use read_md, only: read_options_md, check_options_md
 
-   use vdw_types, only: options_vdw_t
+   use vdw_types, only: vdw_t
    use read_vdw, only: read_options_vdw, check_options_vdw
 
    use exp_types, only: exp_input_t, exp_data_t, exp_indexes_t, pdf_t, sf_t, xrd_t, nd_t, xps_t
@@ -87,7 +87,7 @@ contains
       type(control_t), intent(inout)        :: do_
       type(md_t), intent(inout)             :: md
       type(mc_t), intent(inout)             :: mc
-      type(options_vdw_t), intent(inout)    :: options_vdw
+      type(vdw_t), intent(inout)    :: options_vdw
       ! type(nested_t), intent(inout)         :: nested
       ! type(gap_core_pot_t), intent(inout)   :: gap_core_pot
 
@@ -187,6 +187,7 @@ contains
             !! Checking that each line which has a character on has minimum
             !! number of elements
             call check_read_parameters_count(input, iostatus, 1)
+            if (iostatus /= 0) continue
 
             !-------------------------------------------------------------------
                               !! Read options for the atoms file and thermo data
@@ -194,12 +195,14 @@ contains
                                       thermo, species_info, neighbors, &
                                       keyword_found, error_flag)
             if (keyword_found) continue
+            if (iostatus /= 0) continue
 
             !-------------------------------------------------------------------
                                      !! Read options for controlling the program
             call read_options_control(input, iostatus, rank, keyword, do_, &
                                       keyword_found, error_flag)
             if (keyword_found) continue
+            if (iostatus /= 0) continue
 
             !-------------------------------------------------------------------
                                                  !! Read options for controlling
@@ -208,18 +211,21 @@ contains
                                  keyword_found, error_flag, species_info%n_species, &
                                  species_info%species_types)
             if (keyword_found) continue
+            if (iostatus /= 0) continue
 
             !-------------------------------------------------------------------
                                               !! Read options for controlling MD
             call read_options_md(input, iostatus, rank, keyword, keyword_found, &
                                  md)
             if (keyword_found) continue
+            if (iostatus /= 0) continue
 
             !-------------------------------------------------------------------
             call read_options_vdw(input, iostatus, rank, keyword, options_vdw,&
                  & keyword_found, error_flag, species_info%n_species,&
                  & species_info%species_types)
             if (keyword_found) continue
+            if (iostatus /= 0) continue
 
             !-------------------------------------------------------------------
             call read_exp_options(input, iostatus, rank, keyword, &
@@ -227,6 +233,7 @@ contains
                                   exp_opt, exp_data, &
                                   pdf_opt, sf_opt, xrd_opt, nd_opt, xps_opt)
             if (keyword_found) continue
+            if (iostatus /= 0) continue
 
             ! call read_options_exp(input, iostatus, keyword, options_vdw, keyword_found, &
             !                       error_flag)
@@ -238,7 +245,8 @@ contains
 
             if (.not. keyword_found) then
                call print_error("I do not recognize the input file keyword "//keyword)
-               if (rank == 0) call turbogap_abort()
+               ! if (rank == 0)
+               call turbogap_abort()
             end if
          end if
       end do

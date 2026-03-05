@@ -173,6 +173,19 @@ contains
 
       state%n_sites_supercell = size(state%positions, 2)
 
+#ifdef _DEBUG
+      print *, "1 state%a_box(1)", state%a_box(1)
+      print *, "1 state%a_box(2)", state%a_box(2)
+      print *, "1 state%a_box(3)", state%a_box(3)
+      print *, "1 state%b_box(1)", state%b_box(1)
+      print *, "1 state%b_box(2)", state%b_box(2)
+      print *, "1 state%b_box(3)", state%b_box(3)
+      print *, "1 state%c_box(1)", state%c_box(1)
+      print *, "1 state%c_box(2)", state%c_box(2)
+      print *, "1 state%c_box(3)", state%c_box(3)
+      print *, "1 state%indices", state%indices
+      print *, "1 state%indices_prev", state%indices_prev
+#endif
       !   Very inefficiently build neighbor lists. I should write some routine that performs                              <-- FIX THIS
       !   overlapping domain decomposition to make this more efficient
       !    if( state % a_box(2) == 0.d0 .and. state % a_box(3) == 0.d0 .and. state % b_box(1) == 0.d0 .and. &
@@ -194,6 +207,7 @@ contains
          is_box_square = .false.
          if (rank == 0 .and. print_shape_warning) then
             print_shape_warning = .false.
+#ifdef _DEBUG
             print *, "state%a_box(1)", state%a_box(1)
             print *, "state%a_box(2)", state%a_box(2)
             print *, "state%a_box(3)", state%a_box(3)
@@ -203,6 +217,9 @@ contains
             print *, "state%c_box(1)", state%c_box(1)
             print *, "state%c_box(2)", state%c_box(2)
             print *, "state%c_box(3)", state%c_box(3)
+            print *, "state%indices", state%indices
+            print *, "state%indices_prev", state%indices_prev
+#endif
 
             write (*, *) '                                       |'
             write (*, *) 'WARNING: your simulation box is not    |  <-- WARNING'

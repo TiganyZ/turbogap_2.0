@@ -39,6 +39,18 @@ module md_utils
 
 contains
 
+   subroutine get_volume_abc(a_box, b_box, c_box, indices, volume)
+      integer, intent(in) :: indices(3)
+      real(dp), intent(in) :: a_box(3)
+      real(dp), intent(in) :: b_box(3)
+      real(dp), intent(in) :: c_box(3)
+      real(dp), intent(out) :: volume
+      volume = 0.0_dp
+      volume = dot_product(cross_product(a_box, b_box), c_box) &
+               /(dfloat(indices(1)*indices(2)*indices(3)))
+
+   end subroutine get_volume_abc
+
    subroutine get_volume(state)
       type(state_t), intent(inout) :: state
       state%volume = dot_product(cross_product(state%a_box, state%b_box), state%c_box) &
@@ -888,6 +900,7 @@ contains
 
       if (first_step) then
          backtracking = .true.
+         initialized = .false.
          if (.not. allocated(positions0)) allocate (positions0(1:3, 1:size(positions, 2)))
          if (.not. allocated(forces0)) allocate (forces0(1:3, 1:size(positions, 2)))
          positions0 = positions

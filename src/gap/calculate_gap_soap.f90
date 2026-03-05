@@ -122,10 +122,10 @@ contains
                                  local_properties_indexes, &
                                  local_properties, &
                                  this_local_properties, &
-                                 this_local_properties_pt, &
+                                 ! this_local_properties_pt, &
                                  local_properties_cart_der, &
                                  this_local_properties_cart_der, &
-                                 this_local_properties_cart_der_pt, &
+                                 ! this_local_properties_cart_der_pt, &
                                  time_soap, &
                                  time_gap, &
                                  time_mpi, &
@@ -147,14 +147,14 @@ contains
       integer, intent(in)                :: local_properties_indexes(:)
 
       real(dp), intent(inout), allocatable :: local_properties(:, :)
-      real(dp), intent(inout), allocatable, target :: this_local_properties(:, :)
+      real(dp), intent(inout), allocatable:: this_local_properties(:, :)
 
       real(dp), intent(inout), allocatable :: local_properties_cart_der(:, :, :)
-      real(dp), intent(inout), allocatable, target :: this_local_properties_cart_der(:, :, :)
+      real(dp), intent(inout), allocatable:: this_local_properties_cart_der(:, :, :)
 
                                             !! Pointers for the local properties
-      real(dp), intent(inout), contiguous, pointer :: this_local_properties_pt(:, :)
-      real(dp), intent(inout), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
+      ! real(dp), intent(inout), contiguous, pointer :: this_local_properties_pt(:, :)
+      ! real(dp), intent(inout), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
 
       type(split_t), intent(in)          :: split
 
@@ -194,20 +194,42 @@ contains
       call time_start(time_gap)
 
       if (perform%local_properties) then
-         call reset_local_properties(perform%reallocate, &
-                                     changed%n_sites, &
-                                     do_%forces, &
-                                     do_%rebuild_neighbors_list, &
-                                     state%n_sites, &
-                                     neighbors%n_atom_pairs, &
-                                     neighbors%n_atom_pairs_prev, &
-                                     n_local_properties, &
-                                     local_properties, &
-                                     this_local_properties, &
-                                     this_local_properties_pt, &
-                                     local_properties_cart_der, &
-                                     this_local_properties_cart_der, &
-                                     this_local_properties_cart_der_pt)
+         ! call reset_local_properties(perform%reallocate, &
+         !                             changed%n_sites, &
+         !                             do_%forces, &
+         !                             do_%rebuild_neighbors_list, &
+         !                             state%n_sites, &
+         !                             neighbors%n_atom_pairs, &
+         !                             neighbors%n_atom_pairs_prev, &
+         !                             n_local_properties, &
+         !                             local_properties, &
+         !                             this_local_properties, &
+         !                             this_local_properties_pt, &
+         !                             local_properties_cart_der, &
+         !                             this_local_properties_cart_der, &
+         !                             this_local_properties_cart_der_pt)
+         if (perform%reallocate .or. changed%n_sites) then
+            if (allocated(this_local_properties)) then
+               deallocate (this_local_properties)
+            end if
+            if (allocated(local_properties)) then
+               deallocate (local_properties)
+            end if
+
+            allocate (local_properties(1:state%n_sites, 1:n_local_properties), source=0.0_dp)
+            allocate (this_local_properties(1:state%n_sites, 1:n_local_properties), source=0.0_dp)
+         end if
+
+         if (allocated(this_local_properties_cart_der)) then
+            deallocate (this_local_properties_cart_der)
+         end if
+         if (allocated(local_properties_cart_der)) then
+            deallocate (local_properties_cart_der)
+         end if
+
+         allocate (local_properties_cart_der(3, split%j_end - split%j_beg + 1, n_local_properties), source=0.0_dp)
+         allocate (this_local_properties_cart_der(3, split%j_end - split%j_beg + 1, n_local_properties), source=0.0_dp)
+
       end if
 
       n_lp_count = 0 ! This counts the local properties
@@ -327,8 +349,10 @@ contains
                               soap_turbo_hypers(i)%local_property_models, &
                               this_gap_soap%energies, &
                               this_gap_soap%forces, &
-                              this_local_properties_pt, &
-                              this_local_properties_cart_der_pt, &
+                              this_local_properties, &
+                              this_local_properties_cart_der, &
+                              ! this_local_properties_pt, &
+                              ! this_local_properties_cart_der_pt, &
                               local_properties_indexes, &
                               this_i_beg, &
                               this_i_end, &

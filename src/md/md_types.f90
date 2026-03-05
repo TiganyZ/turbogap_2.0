@@ -80,8 +80,8 @@ module md_types
       character*16 :: optimize = 'vv'
 
                                                     !! Thermostat/barostat types
-      character*32 :: thermostat = 'bussi'
-      character*32 :: barostat = 'berendsen'
+      character*32 :: thermostat = 'none'
+      character*32 :: barostat = 'none'
       character*32 :: barostat_sym = "iso"
 
                                                                   !! Box scaling
@@ -110,8 +110,8 @@ module md_types
       integer, allocatable :: optimize_for_atoms(:)
       integer, allocatable :: thermostat_for_atoms(:)
 
-      real(dp) :: energy_prev
-      real(dp) :: instant_pressure_prev
+      real(dp) :: energy_prev = 0.0_dp
+      real(dp) :: instant_pressure_prev = 0.0_dp
 
    end type md_t
 

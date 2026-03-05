@@ -111,7 +111,7 @@ contains
             end if
                          !!   Check if there are more structures in the xyz file
             read (xyz_file, *, iostat=iostatus) cjunk
-            if (iostatus == 0) then
+            if (iostatus == 0 .and. .not. do_%md) then
                backspace (xyz_file)
                do_%repeat_xyz = .true.
             else
@@ -215,7 +215,7 @@ contains
       end if
 
       if (allocated(state%positions_wrapped)) deallocate (state%positions_wrapped)
-      allocate (state%positions_wrapped(1:3, size(state%positions, 2)), source=state%positions)
+      allocate (state%positions_wrapped, source=state%positions)
    end subroutine recalculate_supercell
 
    subroutine read_xyz_lines(xyz_file, iostatus, do_, state, species_info, properties, &

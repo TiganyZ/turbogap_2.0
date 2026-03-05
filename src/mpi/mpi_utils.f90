@@ -331,6 +331,7 @@ contains
       call MPI_bcast(state%n_sites_supercell, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
       call MPI_bcast(state%n_sites_prev, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
       call MPI_bcast(state%n_local_properties, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%n_local_properties_tot, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
       call MPI_bcast(state%a_box, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
       call MPI_bcast(state%b_box, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
@@ -341,9 +342,20 @@ contains
       call MPI_bcast(state%volume, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
       call MPI_bcast(state%volume_prev, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
+      call MPI_bcast(state%E_kinetic, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
       call synchronize_array(state%positions, rank)
       call synchronize_array(state%positions_supercell, rank)
       call synchronize_array(state%local_properties, rank)
+      ! call synchronize_array(state%local_properties_cart_der, rank)
+      call synchronize_array(state%this_local_properties, rank)
+      ! if (allocated(state%local_properties_cart_der)) deallocate (state%local_properties_cart_der)
+      ! if (allocated(state%this_local_properties_cart_der)) deallocate (state%this_local_properties_cart_der)
+
+      ! call synchronize_array(state%this_local_properties_cart_der, rank)
+      ! call synchronize_array(state%local_property_indexes, rank)
+      ! if ( rank  )
+      ! call synchronize_array(state%local_property_labels, rank)
 
       call synchronize_array(state%species, rank)
       call synchronize_array(state%species_supercell, rank)
@@ -587,7 +599,6 @@ contains
 
       call mpi_bcast(rebuild_neighbors_list, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
       call mpi_bcast(mc_converged, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-      call mpi_bcast(md_converged, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
       call mpi_bcast(do_md, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
       call mpi_bcast(md_i_step, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
@@ -596,6 +607,9 @@ contains
 
       exit_loop = mc_converged
       do_forces = do_md
+      if (do_md) then
+         md_converged = .false.
+      end if
       if (rank == 0) then
          if (do_forces) then
             do_need_velocities = .true.
@@ -608,6 +622,8 @@ contains
       call mpi_bcast(changed%lattice, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
       call mpi_bcast(changed%species, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
       call mpi_bcast(changed%masses, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(md_converged, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(do_need_velocities, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
 #endif
 

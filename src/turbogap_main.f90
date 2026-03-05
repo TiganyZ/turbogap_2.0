@@ -69,7 +69,7 @@ module turbogap_main
    use mc_types, only: mc_t
    use mc_interface, only: perform_mc, calculate_mc_step
 
-   use vdw_types, only: options_vdw_t
+   use vdw_types, only: vdw_t
 
                                                                       !! Reading
    use read_files, only: read_input_file
@@ -144,7 +144,8 @@ contains
                                         !! Options for various calculation types
       type(md_t)     :: md
       type(mc_t)     :: mc
-      type(options_vdw_t)     :: options_vdw
+
+      type(vdw_t)         :: options_vdw
 
       type(xps_t)         :: options_xps
       type(xrd_t)         :: options_xrd
@@ -174,10 +175,10 @@ contains
       logical        :: exit_loop = .false.
 
                                                    !! Information for gap_hypers
-      integer :: n_gap_soap = 0
-      integer :: n_gap_2b = 0
-      integer :: n_gap_3b = 0
-      integer :: n_gap_core_pot = 0
+      integer                           :: n_gap_soap = 0
+      integer                           :: n_gap_2b = 0
+      integer                           :: n_gap_3b = 0
+      integer                           :: n_gap_core_pot = 0
       type(soap_turbo), allocatable     :: gap_soap_hypers(:)
       type(gap_2b_t), allocatable       :: gap_2b_hypers(:)
       type(gap_3b_t), allocatable       :: gap_3b_hypers(:)
@@ -211,22 +212,22 @@ contains
       type(calculation_t) :: this_vdw
 
       !! Container for energies for convenience
-      type(energy_t) :: energy
+      ! type(energy_t) :: energy
 
                                                              !! Local properties
       ! REVIEW: Make local properties into another type?
-      integer :: n_local_properties = 0
-      integer :: n_local_properties_tot = 0
-      integer, allocatable          :: local_property_indexes(:)
-      character*1024, allocatable   :: local_property_labels(:)
-      real(dp), allocatable         :: local_properties(:, :)
-      real(dp), allocatable         :: local_properties_prev(:, :)
-      real(dp), allocatable         :: local_properties_cart_der(:, :, :)
-      real(dp), allocatable, target :: this_local_properties(:, :)
-      real(dp), allocatable, target :: this_local_properties_cart_der(:, :, :)
+      ! integer                     :: n_local_properties = 0
+      ! integer                     :: n_local_properties_tot = 0
+      ! integer, allocatable        :: local_property_indexes(:)
+      ! character*1024, allocatable :: local_property_labels(:)
+      ! real(dp), allocatable         :: local_properties(:, :)
+      ! real(dp), allocatable         :: local_properties_prev(:, :)
+      ! real(dp), allocatable         :: local_properties_cart_der(:, :, :)
+      ! real(dp), allocatable         :: this_local_properties(:, :)
+      ! real(dp), allocatable         :: this_local_properties_cart_der(:, :, :)
 
-      real(dp), contiguous, pointer :: this_local_properties_pt(:, :)
-      real(dp), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
+      ! real(dp), contiguous, pointer :: this_local_properties_pt(:, :)
+      ! real(dp), contiguous, pointer :: this_local_properties_cart_der_pt(:, :, :)
 
                                                  !! Experimental data containers
       !type(exp_data_t), allocatable :: exp_data(:)
@@ -244,10 +245,10 @@ contains
 
                                  !! Variables which allow splitting of mpi tasks
       type(split_t) :: split
-      integer :: i_beg = -1 ! Atoms
-      integer :: i_end = -1 ! Atoms
-      integer :: j_beg = -1 ! Neighbors
-      integer :: j_end = -1 ! Neighbors
+      ! integer :: i_beg = -1 ! Atoms
+      ! integer :: i_end = -1 ! Atoms
+      ! integer :: j_beg = -1 ! Neighbors
+      ! integer :: j_end = -1 ! Neighbors
                                                                        !! OPEMMP
       integer :: n_omp_tasks = 1
 
@@ -378,10 +379,10 @@ contains
                !! Count and connect local properties to experimental/vdw options
       call check_local_properties(rank, do_, &
                                   state%n_local_properties, &
-                                  n_local_properties_tot, &
+                                  state%n_local_properties_tot, &
                                   n_gap_soap, gap_soap_hypers, &
-                                  local_property_labels, &
-                                  local_property_indexes, &
+                                  state%local_property_labels, &
+                                  state%local_property_indexes, &
                                   options_exp%n_exp, exp_data, &
                                   exp_indexes, &
                                   lp_indexes, &
@@ -638,7 +639,6 @@ contains
 
          if (perform%neighbors) then
             call time_start(time%neighbors)
-
                                                       !! Build the neighbor list
             call build_neighbors_list(state, neighbors, do_%rebuild_neighbors_list, &
                                       split, do_%timing, rank)
@@ -662,7 +662,7 @@ contains
                                                   !! Allocate calculation arrays
 
          call time_start(time%allocation)
-         if (perform%reallocate .or. do_%hybrid_mc) then
+         if (perform%reallocate) then
                                                   !! Allocate calculation arrays
             call allocate_calculations(perform, state%n_sites, do_%forces, &
                                        total, &
@@ -704,28 +704,29 @@ contains
                                     params, &
                                     gap_soap, this_gap_soap, &
                                     state%n_local_properties, &
-                                    local_property_indexes, &
-                                    local_properties, this_local_properties, this_local_properties_pt, &
-                                    local_properties_cart_der, &
-                                    this_local_properties_cart_der, &
-                                    this_local_properties_cart_der_pt, &
+                                    state%local_property_indexes, &
+                                    state%local_properties, state%this_local_properties, &
+                                    ! this_local_properties_pt, &
+                                    state%local_properties_cart_der, &
+                                    state%this_local_properties_cart_der, &
+                                    ! this_local_properties_cart_der_pt, &
                                     time%soap, &
                                     time%gap_soap, &
                                     time%mpi, &
                                     time%local_properties)
 
-            if (perform%local_properties) then
+            ! if (perform%local_properties) then
 
-               if (perform%reallocate .or. changed%n_sites) then
-                  if (allocated(state%local_properties)) then
-                     deallocate (state%local_properties)
-                  end if
-                  allocate (state%local_properties, source=local_properties)
-               else
-                  state%local_properties = local_properties
-               end if
+            !    if (perform%reallocate .or. changed%n_sites) then
+            !       if (allocated(state%local_properties)) then
+            !          deallocate (state%local_properties)
+            !       end if
+            !       allocate (state%local_properties, source=local_properties)
+            !    else
+            !       state%local_properties = local_properties
+            !    end if
 
-            end if
+            ! end if
 
          end if
 
@@ -787,7 +788,7 @@ contains
                                                                           !! vdw
          if (perform%vdw) then
             call get_vdw_energy_and_forces(state, species_info, this_vdw, vdw, options_vdw, &
-                                           neighbors, local_properties_cart_der, lp_indexes, split, do_, &
+                                           neighbors, state%local_properties_cart_der, lp_indexes, split, do_, &
                                            time%vdw)
          end if
 
@@ -947,12 +948,11 @@ contains
                call time_start(time%writing)
 
                call wrap_pbc(state)
-               call get_energy_string(state%energies, energies_string)
-               call write_extxyz(file_trajectory, do_, state, md, total, &
-                                 local_property_labels, local_properties, &
-                                 energies_string)
+
+               call write_extxyz(file_trajectory, do_, state, md, total)
 
                call time_end(time%writing)
+
                call print_message("Prediction Energies")
                call print_energies(state%energies, do_)
             end if
@@ -973,11 +973,12 @@ contains
 
                call calculate_md_step(do_, perform, md, state, total, thermo,&
                     & file_thermo, format_thermo, file_trajectory,&
-                    & local_property_labels, local_properties, neighbors%buffer,&
-                    & energy%exp, energies_string, converged_md, time%writing,&
+                    & state%local_property_labels, state%local_properties, neighbors%buffer,&
+                    & state%energies%exp, energies_string, converged_md, time%writing,&
                     & time%mpi, rank, exit_loop)
 
-               energy%kinetic = state%E_kinetic
+               state%energies%kinetic = state%E_kinetic
+
                call print_energies(state%energies, do_)
 
                call time_end(time%md)
@@ -988,8 +989,6 @@ contains
             call broadcast_md(exit_loop, do_%rebuild_neighbors_list, state, converged_md, do_%md, time%mpi)
 
             call synchronize_state(state, rank)
-
-            print *, rank, state%n_sites, size(state%positions, 2), size(gap_soap%energies, 1), size(gap_soap%forces, 2), size(local_properties, 1), size(state%local_properties, 1)
 
             call time_end(time%mpi)
             if (exit_loop) &
@@ -1018,7 +1017,7 @@ contains
 
                call calculate_mc_step(state, &
                                       changed, &
-                                      local_property_labels, &
+                                      state%local_property_labels, &
                                       species_info, thermo, &
                                       mc, md, &
                                       perform, do_, &
@@ -1031,6 +1030,7 @@ contains
                call recalculate_supercell(state, neighbors%rcut_max)
 
                if (do_%need_velocities) then
+
                   call reset_velocities(state, thermo, rank)
                end if
 
@@ -1049,6 +1049,7 @@ contains
             !    if ( allocated( local_properties_cart_der ) ) deallocate(  local_properties_cart_der  )
 
             call synchronize_state(state, rank)
+
             call time_end(time%mpi)
 
             if (changed%n_sites .or. do_%md .or. state%n_sites /= state%n_sites_prev) then

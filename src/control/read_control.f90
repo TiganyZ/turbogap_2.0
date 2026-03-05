@@ -42,6 +42,7 @@ contains
          do_%md = .true.
          do_%prediction = .true.
          do_%forces = .true.
+         do_%need_velocities = .true.
          do_%derivatives = .true.
       else if (trim(mode) == "mc") then
          do_%mc = .true.

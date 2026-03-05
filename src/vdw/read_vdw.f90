@@ -27,7 +27,7 @@
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 module read_vdw
-   use vdw_types, only: options_vdw_t
+   use vdw_types, only: vdw_t
    use printing, only: print_error, print_parameter, print_parameters, print_separator
    use error, only: turbogap_abort
    use read_utils
@@ -53,7 +53,7 @@ contains
       logical, intent(inout) :: keyword_found
       logical, intent(inout) :: error_flag
       ! out
-      type(options_vdw_t), intent(inout) :: options_vdw
+      type(vdw_t), intent(inout) :: options_vdw
 
       !   Let's allocate some arrays:
       if (.not. allocated(options_vdw%c6_ref)) then
@@ -164,7 +164,7 @@ contains
    end subroutine read_options_vdw
 
    subroutine check_options_vdw(options_vdw, n_species, species_types, rank)
-      type(options_vdw_t), intent(inout) :: options_vdw
+      type(vdw_t), intent(inout) :: options_vdw
       integer, intent(in) :: n_species
       integer, intent(in) :: rank
       character*8, allocatable, intent(in) :: species_types(:)

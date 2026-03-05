@@ -35,7 +35,7 @@ module misc
    use error, only: turbogap_abort
    use md_interface, only: initialize_thermo_file
    use mc_utils, only: initialize_mc_log_file
-   use vdw_types, only: options_vdw_t
+   use vdw_types, only: vdw_t
    implicit none
 
 contains
@@ -54,7 +54,7 @@ contains
       type(gap_2b_t), allocatable, intent(in) :: gap_2b_hypers(:)
       integer, intent(in) :: n_gap_3b
       type(gap_3b_t), allocatable, intent(in) :: gap_3b_hypers(:)
-      type(options_vdw_t), intent(in) :: options_vdw
+      type(vdw_t), intent(in) :: options_vdw
 
       integer :: i
 

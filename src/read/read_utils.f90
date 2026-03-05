@@ -158,7 +158,8 @@ contains
          call print_error("TurboGAP has had an issue reading the input file with&
              & the keyword "//keyword//". Please make sure&
              & the number of variables and the types of variables&
-             & are consistent with the documentation")
+             & are consistent with the documentation and that the&
+             & input file ends with a new line character.")
          stop
       end if
    end subroutine check_iostatus

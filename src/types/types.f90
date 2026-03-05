@@ -145,7 +145,6 @@ module types
       integer :: n_sites_prev = -1
       integer :: n_sites_supercell = -1
       integer :: this_n_sites_mpi = -1
-      integer :: n_local_properties
 
      !! Lattice parameters
       real(dp) :: a_box(3) = [1.0_dp, 0.0_dp, 0.0_dp]
@@ -159,6 +158,7 @@ module types
       ! Energy
       real(dp)    :: energy = 0.0_dp
       real(dp)    :: E_kinetic = 0.0_dp
+      real(dp)    :: E_kinetic_prev = 0.0_dp
       type(energy_t) :: energies
 
       ! Instant temperature
@@ -187,7 +187,16 @@ module types
       logical, allocatable     :: fix_atom(:, :)
 
       ! Local properties
+      integer                     :: n_local_properties = 0
+      integer                     :: n_local_properties_tot = 0
+      integer, allocatable        :: local_property_indexes(:)
+      character*1024, allocatable :: local_property_labels(:)
+
       real(dp), allocatable :: local_properties(:, :)
+      real(dp), allocatable :: this_local_properties(:, :)
+
+      real(dp), allocatable :: local_properties_cart_der(:, :, :)
+      real(dp), allocatable :: this_local_properties_cart_der(:, :, :)
 
    end type state_t
 
@@ -385,17 +394,27 @@ contains
       lhs%n_sites = rhs%n_sites
       lhs%n_sites_prev = rhs%n_sites_prev
       lhs%n_sites_supercell = rhs%n_sites_supercell
+
       lhs%this_n_sites_mpi = rhs%this_n_sites_mpi
+
       lhs%n_local_properties = rhs%n_local_properties
+      lhs%n_local_properties_tot = rhs%n_local_properties_tot
+
       lhs%a_box = rhs%a_box
       lhs%b_box = rhs%b_box
       lhs%c_box = rhs%c_box
+
       lhs%indices = rhs%indices
       lhs%indices_prev = rhs%indices_prev
+
       lhs%volume = rhs%volume
       lhs%volume_prev = rhs%volume_prev
+
       lhs%energy = rhs%energy
+
       lhs%E_kinetic = rhs%E_kinetic
+      lhs%E_kinetic_prev = rhs%E_kinetic_prev
+
       lhs%instant_temp = rhs%instant_temp
       lhs%instant_pressure = rhs%instant_pressure
 
@@ -471,6 +490,36 @@ contains
          allocate (lhs%local_properties, source=rhs%local_properties)
       else
          if (allocated(lhs%local_properties)) deallocate (lhs%local_properties)
+      end if
+
+      if (allocated(rhs%this_local_properties)) then
+         allocate (lhs%this_local_properties, source=rhs%this_local_properties)
+      else
+         if (allocated(lhs%this_local_properties)) deallocate (lhs%this_local_properties)
+      end if
+
+      if (allocated(rhs%local_properties_cart_der)) then
+         allocate (lhs%local_properties_cart_der, source=rhs%local_properties_cart_der)
+      else
+         if (allocated(lhs%local_properties_cart_der)) deallocate (lhs%local_properties_cart_der)
+      end if
+
+      if (allocated(rhs%this_local_properties_cart_der)) then
+         allocate (lhs%this_local_properties_cart_der, source=rhs%this_local_properties_cart_der)
+      else
+         if (allocated(lhs%this_local_properties_cart_der)) deallocate (lhs%this_local_properties_cart_der)
+      end if
+
+      if (allocated(rhs%local_property_indexes)) then
+         allocate (lhs%local_property_indexes, source=rhs%local_property_indexes)
+      else
+         if (allocated(lhs%local_property_indexes)) deallocate (lhs%local_property_indexes)
+      end if
+
+      if (allocated(rhs%local_property_labels)) then
+         allocate (lhs%local_property_labels, source=rhs%local_property_labels)
+      else
+         if (allocated(lhs%local_property_labels)) deallocate (lhs%local_property_labels)
       end if
 
    end subroutine assign_state

@@ -32,7 +32,9 @@ module mc_interface
    use calculation, only: allocate_calculation
    use mc_types, only: mc_t
    use md_types, only: md_t
-   use types, only: state_t, change_in_state_t, input_parameters, species_info_t, thermo_t, calculation_t, energy_t, assignment(=), assign_state
+   use types, only: state_t, change_in_state_t, input_parameters, &
+                    species_info_t, thermo_t, calculation_t, energy_t, assignment(=), &
+                    assign_state
    use timing, only: time_start, time_end
    use printing, only: print_error, print_debug, print_note, print_message, print_warning, print_parameter, print_separator
 
@@ -208,13 +210,15 @@ contains
       call time_start(time)
       if (mc%i_step == 0) then
          ! Initialize MC
-
+         state%E_kinetic_prev = state%E_kinetic
+         if (.not. mc%hamiltonian) state%E_kinetic = 0.d0
          call initialize_mc(state, species_info, mc, do_, current, trial)
 
       else
          ! Perform mc step
 
          ! We do not need kinetic energy if we aren't doing hamiltonian mc
+         state%E_kinetic_prev = state%E_kinetic
          if (.not. mc%hamiltonian) state%E_kinetic = 0.d0
 
          call assign_state(mc%states(trial), state)
@@ -223,6 +227,7 @@ contains
          if (mc%move == "relax" .or. mc%move == "md" .or. (mc%relax .and. mc%relax)) then
             md%i_step = -1
             do_%md = .false.
+            do_%need_velocities = .true.
          end if
 
          ! if (mc%accessible_volume) then
@@ -287,6 +292,7 @@ contains
             ! Then change the trial state into the current state!
             call assign_state(mc%states(current), mc%states(trial))
          end if
+
       end if
 
       if (state%n_sites /= mc%states(current)%n_sites) then
@@ -311,11 +317,7 @@ contains
 
          md_fake%i_step = mc%i_step
 
-         energies_string = ""
-         call get_energy_string(state%energies, energies_string)
-         call write_extxyz(file_mc, do_, state, md_fake, total, &
-                           local_property_labels, state%local_properties, &
-                           energies_string)
+         call write_extxyz(file_mc, do_, state, md_fake, total)
 
          call time_end(time_writing)
       end if
@@ -323,6 +325,7 @@ contains
       mc%converged = check_converged_mc(mc%i_step, mc%n_steps)
 
       if (.not. mc%converged) then
+
          call perform_mc_step( &
             changed, &
             state%positions, &
@@ -395,6 +398,17 @@ contains
       end if
 
       do_%rebuild_neighbors_list = .true.
+
+      if (trim(mc%move) == 'md' .or. mc%relax) then
+         do_%need_velocities = .true.
+      end if
+
+      ! if (mc%move == "relax" .or. mc%move == "md" .or. (mc%relax)) then
+      !    do_%need_velocities = .true.
+      ! end if
+      ! if ( trim(mc%move) == 'md'  ) then
+      !    if ( mc%hamiltonian == .false.  )then
+      !       if ( .not. allocated( state%velocities ) )then
 
       ! if (changed%n_sites) then
       !    perform%reallocate = .true.

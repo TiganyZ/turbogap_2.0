@@ -29,7 +29,7 @@
 module mc_utils
 
    use kinds, only: dp
-   use md_utils, only: wrap_pbc
+   use md_utils, only: wrap_pbc, get_volume_abc
    use md_interface, only: get_formatted_file_strings
    use mc_types, only: mc_t
    use types, only: change_in_state_t
@@ -756,6 +756,7 @@ contains
 
          call random_number(ranf)
 
+         call get_volume_abc(a_box, b_box, c_box, indices, v_uc)
          ! v_uc = dot_product(cross_product(a_box, b_box), c_box)/(dfloat(indices(1)*indices(2)*indices(3)))
 
          lnvn = log(v_uc) + (ranf - 0.5d0)*ln_vol_max
@@ -963,10 +964,9 @@ contains
          do_mc_relax = .true.
       end if
 
-      if (do_mc_relax) then
+      if (do_mc_relax .or. trim(mc_move) == "md") then
          md_istep = -1
          do_md = .true.
-         converged_md = .false.
       end if
 
       if (changed%n_sites .or. do_md) then
@@ -1074,6 +1074,8 @@ contains
          energy_exp_trial, &
          energy_exp_current, &
          trim(temp_string2)
+
+      flush (file_mc_log)
 
    end subroutine write_mc_log
 

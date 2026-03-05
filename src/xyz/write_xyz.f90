@@ -171,25 +171,24 @@ contains
 
    end subroutine get_xyz_energy_string
 
-   subroutine write_extxyz(trajectory, do_, state, md, &
-                           calc, &
-                           local_property_labels, local_properties, energies_string)
-
+   subroutine write_extxyz(trajectory, do_, state, md, calc)
                                                          !! Trajectory file unit
       integer, intent(in)           :: trajectory
       type(control_t), intent(in)   :: do_
       type(state_t), intent(in)     :: state
       type(md_t), intent(in)        :: md
       type(calculation_t), intent(in) :: calc
-      character*1024, intent(in)    :: local_property_labels(:)
-      real(dp), intent(in)          :: local_properties(:, :)
-      character*1024, intent(in) :: energies_string
+      ! character*1024, intent(in)    :: local_property_labels(:)
+      ! real(dp), intent(in)          :: local_properties(:, :)
+      character*1024 :: energies_string = ""
 
 !   Internal variables:
       real*8 :: vol
       integer :: n_properties, n_array_properties, i, j, k
       character*1024 :: properties_string
       character*16 :: lattice_string(1:16), temp_string
+
+      call get_energy_string(state%energies, energies_string)
 
       n_properties = 0
       do i = 1, size(do_%write_property)
@@ -269,7 +268,7 @@ contains
 
             do k = 1, size(do_%write_local_properties, 1)
                if (do_%write_local_properties(k)) then
-                  write (properties_string, "(A)") trim(adjustl(properties_string))//trim(local_property_labels(k))//":R:1"
+                  write (properties_string, "(A)") trim(adjustl(properties_string))//trim(state%local_property_labels(k))//":R:1"
                   i = i + 1
                   if (i < n_array_properties) then
                      write (properties_string, "(A)") trim(adjustl(properties_string))//":"
@@ -365,7 +364,13 @@ contains
 !
 !   Volume
       if (do_%write_property(10)) then
-         write (temp_string, "(F16.6)") dot_product(cross_product(state%a_box/state%indices(1), state%b_box/state%indices(2)), state%c_box/state%indices(3))
+         write (temp_string, "(F16.6)") &
+            dot_product( &
+            cross_product( &
+            state%a_box/state%indices(1), &
+            state%b_box/state%indices(2)), &
+            state%c_box/state%indices(3))
+
          write (trajectory, "(1X,2A)", advance="no") "volume=", trim(adjustl(temp_string))
       end if
 !
@@ -417,8 +422,8 @@ contains
          ! end if
 ! Local properties
          if (allocated(do_%write_local_properties)) then
-            do j = 1, size(local_properties, 2)
-               write (trajectory, "(1X,F16.8)", advance="no") local_properties(i, j)
+            do j = 1, size(state%local_properties, 2)
+               write (trajectory, "(1X,F16.8)", advance="no") state%local_properties(i, j)
             end do
          end if
 
@@ -429,6 +434,7 @@ contains
 !     Advance
          write (trajectory, *)
       end do
+      flush (trajectory)
 
    end subroutine write_extxyz
 

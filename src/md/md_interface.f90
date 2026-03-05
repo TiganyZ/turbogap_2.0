@@ -78,14 +78,17 @@ contains
       end if
 
       call random_number(state%velocities)
+
       call remove_cm_vel(state%velocities(1:3, 1:state%n_sites), &
                          state%masses(1:state%n_sites))
+
       state%E_kinetic = 0.0_dp
       do i = 1, state%n_sites
          state%E_kinetic = state%E_kinetic + &
                            0.5_dp*state%masses(i)* &
                            dot_product(state%velocities(1:3, i), &
                                        state%velocities(1:3, i))
+
       end do
       state%instant_temp = 2.0_dp/3.0_dp/dfloat(state%n_sites - 1)/kB*state%E_kinetic
       state%velocities = state%velocities*dsqrt(thermo%t_beg/state%instant_temp)
@@ -365,7 +368,7 @@ contains
             b_box(1), b_box(2), b_box(3), &
             c_box(1), c_box(2), c_box(3)
       end if
-
+      flush (file_thermo)
    end subroutine write_thermo_file
 
    pure function check_converged_relaxation(do_, md, n_sites, energy, energy_prev, forces, rank) result(converged)
@@ -617,51 +620,56 @@ contains
                                 file_thermo, format_thermo, file_trajectory, local_property_labels, local_properties, &
                                 neighbors_buffer, energy_exp, energies_string, &
                                 converged, time_writing, time_mpi, rank, exit_loop)
-      type(control_t), intent(inout) :: do_
-      type(perform_t), intent(in) :: perform
-      type(state_t), intent(inout) :: state
+
+      type(control_t), intent(inout)     :: do_
+      type(perform_t), intent(in)        :: perform
+      type(state_t), intent(inout)       :: state
       type(calculation_t), intent(inout) :: total
-      type(md_t), intent(inout) :: md
-      type(thermo_t), intent(inout) :: thermo
-      integer, intent(in) :: file_thermo
-      integer, intent(in) :: file_trajectory
-      character*1024, intent(in) :: format_thermo
-      real(dp), intent(in) :: neighbors_buffer
-      real(dp), intent(in) :: energy_exp
-      character*1024, intent(inout) :: energies_string
-      character*1024, intent(in) :: local_property_labels(:)
-      real(dp), intent(in) :: local_properties(:, :)
+      type(md_t), intent(inout)          :: md
+      type(thermo_t), intent(inout)      :: thermo
+      integer, intent(in)                :: file_thermo
+      integer, intent(in)                :: file_trajectory
+      character*1024, intent(in)         :: format_thermo
+      real(dp), intent(in)               :: neighbors_buffer
+      real(dp), intent(in)               :: energy_exp
+      character*1024, intent(inout)      :: energies_string
+      character*1024, intent(in)         :: local_property_labels(:)
+      real(dp), intent(in)               :: local_properties(:, :)
 
-      real(dp), intent(inout) :: time_writing(3)
-      real(dp), intent(inout) :: time_mpi(3)
+      real(dp), intent(inout)            :: time_writing(3)
+      real(dp), intent(inout)            :: time_mpi(3)
 
-      integer, intent(in) :: rank
-      logical, intent(inout) :: exit_loop
+      integer, intent(in)                :: rank
+      logical, intent(inout)             :: exit_loop
 
-      real(dp) :: lv(3, 3)
-      real(dp) :: instant_pressure_tensor(3, 3)
-      real(dp) :: target_temp
+      real(dp)                           :: lv(3, 3)
+      real(dp)                           :: instant_pressure_tensor(3, 3)
+      real(dp)                           :: target_temp
 
-      real(dp), parameter :: kB = 8.6173303d-5
-      real(dp), parameter :: eVperA3tobar = 1602176.6208_dp
+      real(dp), parameter                :: kB = 8.6173303d-5
+      real(dp), parameter                :: eVperA3tobar = 1602176.6208_dp
 
-      real(dp) :: max_diff
-      real(dp) :: temp_max_diff
-      integer :: max_diff_idx
+      real(dp)                           :: max_diff
+      real(dp)                           :: temp_max_diff
+      integer                            :: max_diff_idx
 
-      logical :: converged_relaxation
-      logical :: converged_box_relaxation
-      logical :: converged_md
-      logical, intent(out) :: converged
+      logical                            :: converged_relaxation
+      logical                            :: converged_box_relaxation
+      logical                            :: converged_md
+      logical, intent(out)               :: converged
 
-      integer :: i
-      integer :: ierr
-      integer, allocatable :: optimize_for_atoms(:)
+      integer                            :: i
+      integer                            :: ierr
+      integer, allocatable               :: optimize_for_atoms(:)
 
       !***************************************************************************
                                                                 !! Initial Setup
       ! Define the time_step and md_time prior to possible scaling (see
       ! variable_time_step below)
+      !
+      !
+      !
+
       if (md%i_step > 0) then
          md%time = md%time + md%time_step
       else
@@ -941,10 +949,7 @@ contains
          !                            %valid_nd, do_%pair_distribution, do_%structure_factor, do_%xrd, &
          !                            do_%nd, string)
 
-         call get_energy_string(state%energies, energies_string)
-         call write_extxyz(file_trajectory, do_, state, md, total, &
-                           local_property_labels, local_properties, &
-                           energies_string)
+         call write_extxyz(file_trajectory, do_, state, md, total)
 
          call time_end(time_writing)
       end if
@@ -1159,6 +1164,7 @@ contains
       call print_parameter("Step  #", md%i_step)
       call print_parameter("n_steps", md%n_steps)
       call print_parameter("converged", converged)
+
    end subroutine calculate_md_step
 
    subroutine set_supercell_positions(n_sites, positions, a_box, b_box, c_box, indices)

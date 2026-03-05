@@ -319,6 +319,9 @@ contains
       if (do_%md) &
          do_%need_velocities = .true.
 
+      if (do_%md) &
+         do_%forces = .true.
+
 !   Get masses from database
       if ((do_%md .or. do_%mc) .and. .not. species_info%masses_in_input_file) then
          if (rank == 0) then
