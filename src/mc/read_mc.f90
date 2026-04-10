@@ -170,6 +170,13 @@ contains
             call print_parameter("mc_min_dist", mc%min_dist)
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
+      else if (keyword == 'mc_max_dist') then
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, mc%max_dist
+         if (rank == 0) &
+            call print_parameter("mc_max_dist", mc%max_dist)
+         call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (keyword == 'mc_n_planes') then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, mc%n_planes

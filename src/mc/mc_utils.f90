@@ -351,14 +351,14 @@ contains
    end subroutine get_mc_move
 
    subroutine mc_insert_site(mc_species, mc_id, positions, ref_positions, idx, n_sites, a_box, b_box, c_box, &
-                            indices, species, ref_species, xyz_species, ref_xyz_species, min_dist, cannot_insert_site, max_trials, &
+                  indices, species, ref_species, xyz_species, ref_xyz_species, min_dist, max_dist, cannot_insert_site, max_trials, &
                              mc_n_planes, mc_planes, mc_max_dist_to_planes, mc_planes_restrict_to_polyhedron)
 
       implicit none
 
       real*8, intent(inout) :: positions(:, :)
       real*8, intent(in) :: ref_positions(:, :)
-      real*8, intent(in) :: a_box(1:3), b_box(1:3), c_box(1:3), min_dist
+      real*8, intent(in) :: a_box(1:3), b_box(1:3), c_box(1:3), min_dist, max_dist
       real*8 :: ranv(1:3)
       integer, intent(in) :: idx, n_sites, indices(1:3), ref_species(:), max_trials
       integer, intent(inout) :: species(:), mc_id
@@ -367,7 +367,7 @@ contains
       character*8, intent(in) :: mc_species
       logical, intent(out) :: cannot_insert_site
       integer :: n_trials
-      logical :: too_close, too_far, mc_planes_restrict_to_polyhedron
+      logical :: too_close, too_far, too_far_planes, mc_planes_restrict_to_polyhedron
 
 !    real*8 :: mc_max_dist
       integer :: mc_n_planes
@@ -382,6 +382,7 @@ contains
       cannot_insert_site = .true.
       too_close = .true.
       too_far = .true.
+      too_far_planes = .true.
 
       n_trials = 0
       do while (.true.)
@@ -400,9 +401,13 @@ contains
          ! call wrap_pbc_cell(positions(1:3, 1:n_sites), a_box/dfloat(indices(1)), &
          !               b_box/dfloat(indices(2)), c_box/dfloat(indices(3)))
 
-         call check_if_atoms_too_close(positions(1:3, n_sites), ref_positions, n_sites - 1, &
-                                  a_box/dfloat(indices(1)), b_box/dfloat(indices(2)), c_box/dfloat(indices(3)), min_dist, too_close)
+         ! call check_if_atoms_too_close(positions(1:3, n_sites), ref_positions, n_sites - 1, &
+         !                          a_box/dfloat(indices(1)), b_box/dfloat(indices(2)), c_box/dfloat(indices(3)), min_dist, too_close)
 
+         call check_if_atoms_too_close_or_far(positions(1:3, n_sites), ref_positions, n_sites - 1, &
+                                              a_box/dfloat(indices(1)), b_box/dfloat(indices(2)), c_box/dfloat(indices(3)), &
+                                              min_dist, too_close, &
+                                              max_dist, too_far)
          if (mc_n_planes > 0) then
             if (mc_planes_restrict_to_polyhedron) then
                call check_in_polyhedron(positions(1:3, n_sites), mc_n_planes, mc_planes, too_far)
@@ -412,15 +417,15 @@ contains
             end if
 
          else
-            too_far = .false.
+            too_far_planes = .false.
          end if
 
          if (n_trials > max_trials .or. &
-             (.not. too_close .and. .not. too_far)) exit
+             (.not. too_close .and. .not. too_far .and. .not. too_far_planes)) exit
 
       end do
 
-      cannot_insert_site = too_close .or. too_far
+      cannot_insert_site = (n_trials > max_trials)
 
    end subroutine mc_insert_site
 
@@ -487,35 +492,39 @@ contains
       too_far_out = too_far
    end subroutine check_if_far_from_planes
 
-   subroutine check_if_atoms_too_close(position, ref_positions, n_sites, &
-                                       a_box, b_box, c_box, min_dist, too_close_out)
+   subroutine check_if_atoms_too_close_or_far(position, ref_positions, n_sites, &
+                                              a_box, b_box, c_box, &
+                                              min_dist, too_close_out, &
+                                              max_dist, too_far_out)
       implicit none
       integer, intent(in) :: n_sites
       integer :: i, i_shift(1:3)
-      real*8, intent(in) :: position(:), ref_positions(:, :), min_dist
+      real*8, intent(in) :: position(:), ref_positions(:, :), min_dist, max_dist
       real*8, intent(in) :: a_box(1:3), b_box(1:3), c_box(1:3)
       real*8 :: d, dist(1:3), minimum = 10000000.d0
       logical :: too_close
+      logical :: too_far
       logical, intent(out) :: too_close_out
+      logical, intent(out) :: too_far_out
 
       minimum = 10000000.d0
       too_close = .false.
+      too_far = .false.
       check: do i = 1, n_sites
          call get_distance(position(1:3), ref_positions(1:3, i), &
                            a_box, b_box, c_box, (/.true., .true., .true./), dist, d, i_shift)
 
          minimum = min(d, minimum)
 
-         if (minimum < min_dist) then
-            too_close = .true.
-            exit check
-         end if
       end do check
 
-      too_close_out = too_close
+      if (minimum < min_dist) too_close = .true.
+      if (minimum > max_dist) too_far = .true.
 
-!    print *, "check_if_atoms_too_close: too_close = ", too_close_out, " minimum_found = ", minimum, " min_dist = ", min_dist
-   end subroutine check_if_atoms_too_close
+      too_close_out = too_close
+      too_far_out = too_far
+
+   end subroutine check_if_atoms_too_close_or_far
 
    subroutine count_swap_species(n_spec_swap_1, n_spec_swap_2,&
         & species_types, n_mc_swaps, mc_swaps_id, species, n_sites,&
@@ -583,6 +592,7 @@ contains
       mc_species, &
       mc_move_max, &
       mc_min_dist, &
+      mc_max_dist, &
       mc_max_insertion_trials, &
       ln_vol_max, &
       mc_types, &
@@ -632,7 +642,7 @@ contains
       real(dp), allocatable, intent(in) :: masses_types(:)
       real*8 :: mc_move_max, ln_vol_max, lnvn, vn, v_uc, length,&
            & length_prev, l_prop, ranf, ranv(1:3), kB = 8.6173303d-5
-      real*8, intent(inout) :: disp(1:3), mc_min_dist, d_disp,&
+      real*8, intent(inout) :: disp(1:3), mc_min_dist, mc_max_dist, d_disp,&
            & E_kinetic, instant_temp
       real(dp), intent(in) :: t_beg
       integer, intent(in) :: n_lp, verb, mc_max_insertion_trials, mc_n_planes
@@ -844,7 +854,7 @@ contains
                  & im_pos, idx, n_sites,&
                  & a_box, b_box, c_box, indices, species,&
                  & im_species, xyz_species,&
-                 & im_xyz_species, mc_min_dist, cannot_insert_site, mc_max_insertion_trials,&
+                 & im_xyz_species, mc_min_dist, mc_max_dist, cannot_insert_site, mc_max_insertion_trials,&
                  & mc_n_planes, mc_planes, mc_max_dist_to_planes, mc_planes_restrict_to_polyhedron)
 
             if (cannot_insert_site) then

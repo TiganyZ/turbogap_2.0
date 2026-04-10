@@ -60,6 +60,7 @@ module mc_types
       integer  :: max_insertion_trials = 500
       real(dp) :: lnvol_max = 0.01_dp
       real(dp) :: min_dist = 0.01_dp
+      real(dp) :: max_dist = 10000000.0_dp
       real(dp) :: move_max = 0.01_dp
       real(dp) :: accessible_volume = 0.0_dp
 

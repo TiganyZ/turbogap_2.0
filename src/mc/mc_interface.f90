@@ -354,6 +354,7 @@ contains
             mc%species, &
             mc%move_max, &
             mc%min_dist, &
+            mc%max_dist, &
             mc%max_insertion_trials, &
             mc%lnvol_max, &
             mc%types, &
