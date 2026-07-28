@@ -28,7 +28,7 @@
 
 module state_interface
    use kinds, only: dp
-   use types, only: state_t
+   use types, only: state_t, energy_t
    use control, only: control_t
    use printing, only: print_parameter, print_parameters
    ! use misc, only: print_energies
@@ -36,6 +36,10 @@ module state_interface
    implicit none
 
 contains
+
+   subroutine reset_energies(energies)
+      type(energy_t), intent(out) :: energies
+   end subroutine reset_energies
 
    subroutine reset_state(state)
       type(state_t), intent(out) :: state

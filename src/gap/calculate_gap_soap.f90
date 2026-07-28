@@ -105,6 +105,42 @@ contains
       end if
    end subroutine reset_local_properties
 
+   subroutine calculate_e0(do_, split, species_info, state, energies_e0, this_energies_e0, time_mpi)
+      type(control_t), intent(in)        :: do_
+      type(state_t), intent(in)          :: state
+      type(split_t), intent(in)          :: split
+      type(species_info_t), intent(in)   :: species_info
+      real(dp), allocatable, intent(inout) ::      energies_e0(:)
+      real(dp), allocatable, intent(inout) :: this_energies_e0(:)
+      real(dp), intent(inout) :: time_mpi(3)
+      integer :: i
+      integer :: j
+      integer :: ierr
+
+      if (do_%prediction) then
+         !       Assign the e0 to each atom according to its species
+         !        do i = 1, n_sites
+         do i = split%i_beg, split%i_end
+            do j = 1, species_info%n_species
+               if (state%xyz_species(i) == species_info%species_types(j)) then
+                  energies_e0(i) = species_info%e0(j)
+               end if
+            end do
+         end do
+      end if
+
+      !     Collect all energies
+      !     NOTE: Why do we reduce here> Don't we reduce after?
+#ifdef _MPIF90
+
+      call time_start(time_mpi)
+      call mpi_reduce(energies_e0, this_energies_e0, state%n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      call time_end(time_mpi)
+      energies_e0 = this_energies_e0
+#endif
+
+   end subroutine calculate_e0
+
    subroutine calculate_gap_soap(rank, &
                                  do_, &
                                  perform, &
@@ -236,27 +272,27 @@ contains
 
       !*************************************************************************
                                                                 !! GAP SOAP loop
-      if (do_%prediction) then
-         !       Assign the e0 to each atom according to its species
-         !        do i = 1, n_sites
-         do i = split%i_beg, split%i_end
-            do j = 1, species_info%n_species
-               if (state%xyz_species(i) == species_info%species_types(j)) then
-                  gap_soap%energies(i) = species_info%e0(j)
-               end if
-            end do
-         end do
-      end if
+!       if (do_%prediction) then
+!          !       Assign the e0 to each atom according to its species
+!          !        do i = 1, n_sites
+!          do i = split%i_beg, split%i_end
+!             do j = 1, species_info%n_species
+!                if (state%xyz_species(i) == species_info%species_types(j)) then
+!                   gap_soap%energies(i) = species_info%e0(j)
+!                end if
+!             end do
+!          end do
+!       end if
 
-      !     Collect all energies
-      !     NOTE: Why do we reduce here> Don't we reduce after?
-#ifdef _MPIF90
+!       !     Collect all energies
+!       !     NOTE: Why do we reduce here> Don't we reduce after?
+! #ifdef _MPIF90
 
-      call time_start(time_mpi)
-   call mpi_reduce(gap_soap%energies, this_gap_soap%energies, state%n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      call time_end(time_mpi)
-      gap_soap%energies = this_gap_soap%energies
-#endif
+!       call time_start(time_mpi)
+!    call mpi_reduce(gap_soap%energies, this_gap_soap%energies, state%n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!       call time_end(time_mpi)
+!       gap_soap%energies = this_gap_soap%energies
+! #endif
 
       do i = 1, n_soap
          !       Compute number of pairs for this SOAP. SOAP has in general a different cutoff than overall max

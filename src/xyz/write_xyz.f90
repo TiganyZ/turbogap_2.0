@@ -76,6 +76,9 @@ contains
       write (temp_string, "(F16.8)") energies%total
       write (string, "(A)") adjustl(trim(string))//" energy_total="//trim(adjustl(temp_string))
 
+      write (temp_string, "(F16.8)") energies%e0
+      write (string, "(A)") adjustl(trim(string))//" energy_e0="//trim(adjustl(temp_string))
+
       write (temp_string, "(F16.8)") energies%kinetic
       write (string, "(A)") adjustl(trim(string))//" energy_kinetic="//trim(adjustl(temp_string))
 
@@ -334,7 +337,7 @@ contains
 !
 !  Total energy
       if (do_%write_property(7)) then
-         write (temp_string, "(F16.6)") sum(calc%energies)
+         write (temp_string, "(F16.6)") state%energy
          write (trajectory, "(1X,2A)", advance="no") "energy=", trim(adjustl(temp_string))
 
          write (trajectory, "(1X,A)", advance="no") trim(adjustl(energies_string))

@@ -314,6 +314,7 @@ contains
       call print_small_message("Energies")
 
       call print_parameter("Energy total", energy%total, "eV")
+      call print_parameter("Energy    e0", energy%e0, "eV")
 
       if (do_%md) &
          call print_parameter("Energy kinetic", energy%kinetic, "eV")

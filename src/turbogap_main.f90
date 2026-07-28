@@ -60,7 +60,7 @@ module turbogap_main
                                               !! have them be like the way above
 
                                                         !! Main simulation types
-   use state_interface, only: reallocate_state, reallocate_state_supercell, print_state
+   use state_interface, only: reallocate_state, reallocate_state_supercell, print_state, reset_energies
 
    use md_types, only: md_t
    use md_interface, only: reset_velocities, calculate_md_step
@@ -86,7 +86,7 @@ module turbogap_main
 
    use neighbors_interface, only: build_neighbors_list, collect_neighbors, deallocate_neighbors
 
-   use calculate_gap_soap_mod, only: calculate_gap_soap, reset_local_properties
+   use calculate_gap_soap_mod, only: calculate_gap_soap, calculate_e0, reset_local_properties
    use gap, only: calculate_gap_2b, calculate_gap_3b, calculate_gap_core_pot
 
    use vdw_interface, only: get_vdw_energy_and_forces
@@ -162,7 +162,7 @@ contains
       type(state_t)              :: state
       type(state_t)              :: state_prev
       type(state_t), allocatable :: states(:)
-      type(change_in_state_t) :: changed
+      type(change_in_state_t)    :: changed
 
                                                           !! Species information
       type(species_info_t)    :: species_info
@@ -210,6 +210,9 @@ contains
       type(calculation_t) :: this_xrd
       type(calculation_t) :: this_xps
       type(calculation_t) :: this_vdw
+
+      real(dp), allocatable ::      energies_e0(:)
+      real(dp), allocatable :: this_energies_e0(:)
 
       !! Container for energies for convenience
       ! type(energy_t) :: energy
@@ -427,10 +430,11 @@ contains
                                    !! Define what things to do during simulation
 
                             !! Setting that we will always do these calculations
-      do_%only_prediction = (do_%prediction &
-                             .and. .not. do_%md &
-                             .and. .not. do_%mc &
-                             .and. .not. do_%nested_sampling)
+      do_%only_prediction = (trim(mode) == "predict")
+      ! (do_%prediction &
+      !                        .and. .not. do_%md &
+      !                        .and. .not. do_%mc &
+      !                        .and. .not. do_%nested_sampling)
 
       perform%gap_soap = (n_gap_soap > 0)
       perform%gap_2b = (n_gap_2b > 0)
@@ -665,6 +669,7 @@ contains
          if (perform%reallocate) then
                                                   !! Allocate calculation arrays
             call allocate_calculations(perform, state%n_sites, do_%forces, &
+                                       energies_e0, this_energies_e0, &
                                        total, &
                                        gap_soap, gap_2b, gap_3b, gap_core_pot, &
                                        pdf, sf, xrd, nd, xps, vdw, &
@@ -675,6 +680,7 @@ contains
          else
                                               !! Reinitialize calculation arrays
             call reset_calculations(perform, do_%forces, &
+                                    energies_e0, this_energies_e0, &
                                     total, &
                                     gap_soap, gap_2b, gap_3b, gap_core_pot, &
                                     pdf, sf, xrd, nd, xps, vdw, &
@@ -684,9 +690,19 @@ contains
                                     this_xrd, this_xps, this_vdw)
 
          end if
+         call reset_energies(state%energies)
+
          call time_end(time%allocation)
 
                                        !! Finished allocation calculation arrays
+         !*************************************************************************
+
+         !*************************************************************************
+                                                                       !! get_e0
+
+         call calculate_e0(do_, split, species_info, state, energies_e0, this_energies_e0, time%mpi)
+
+                                                        !! Finished calculate e0
          !*************************************************************************
 
          !*************************************************************************
@@ -871,6 +887,9 @@ contains
 
          call time_end(time%mpi)
 
+         state%energies%e0 = sum(energies_e0)
+         total%energies = total%energies + energies_e0
+
          if (perform%gap_soap) then
             total%energies = total%energies + gap_soap%energies
          end if
@@ -891,8 +910,9 @@ contains
             total%energies = total%energies + vdw%energies
          end if
 
-         state%energy = sum(total%energies)
-         state%energies%total = state%energy
+         total%energy = sum(total%energies)
+         state%energy = total%energy
+         state%energies%total = total%energy
 
          if (do_%forces) then
 
@@ -1057,6 +1077,7 @@ contains
                call time_start(time%allocation)
                ! reallocate all calculation types to the correct size
                call allocate_calculations(perform, state%n_sites, do_%forces, &
+                                          energies_e0, this_energies_e0, &
                                           total, &
                                           gap_soap, gap_2b, gap_3b, gap_core_pot, &
                                           pdf, sf, xrd, nd, xps, vdw, &

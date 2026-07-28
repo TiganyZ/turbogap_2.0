@@ -22,6 +22,7 @@ contains
    end subroutine reset_calculation
 
    subroutine reset_calculations(perform, do_forces, &
+                                 energies_e0, this_energies_e0, &
                                  total, &
                                  gap_soap, &
                                  gap_2b, &
@@ -45,6 +46,9 @@ contains
       type(perform_t), intent(in) :: perform
       logical, intent(in) :: do_forces
 
+      real(dp), allocatable, intent(inout) :: energies_e0(:)
+      real(dp), allocatable, intent(inout) :: this_energies_e0(:)
+
       type(calculation_t), intent(inout) :: total
       type(calculation_t), intent(inout) :: gap_soap
       type(calculation_t), intent(inout) :: gap_2b
@@ -66,6 +70,9 @@ contains
       type(calculation_t), intent(inout) :: this_xrd
       type(calculation_t), intent(inout) :: this_xps
       type(calculation_t), intent(inout) :: this_vdw
+
+      energies_e0 = 0.0_dp
+      this_energies_e0 = 0.0_dp
 
       call reset_calculation(total, do_forces)
 
@@ -117,6 +124,7 @@ contains
    end subroutine allocate_calculation
 
    subroutine allocate_calculations(perform, n_sites, do_forces, &
+                                    energies_e0, this_energies_e0, &
                                     total, &
                                     gap_soap, &
                                     gap_2b, &
@@ -141,6 +149,9 @@ contains
       integer, intent(in) :: n_sites
       logical, intent(in) :: do_forces
 
+      real(dp), allocatable, intent(out) :: energies_e0(:)
+      real(dp), allocatable, intent(out) :: this_energies_e0(:)
+
       type(calculation_t), intent(out) :: total
       type(calculation_t), intent(out) :: gap_soap
       type(calculation_t), intent(out) :: gap_2b
@@ -162,6 +173,9 @@ contains
       type(calculation_t), intent(out) :: this_xrd
       type(calculation_t), intent(out) :: this_xps
       type(calculation_t), intent(out) :: this_vdw
+
+      allocate (energies_e0(n_sites), source=0.0_dp)
+      allocate (this_energies_e0(n_sites), source=0.0_dp)
 
       call allocate_calculation(n_sites, total, do_forces)
 

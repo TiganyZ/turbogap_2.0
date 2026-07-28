@@ -107,6 +107,7 @@ module types
 
                               !! Container type for all energies for convenience
    type energy_t
+      real(dp) :: e0 = 0.0_dp
       real(dp) :: total = 0.0_dp
       real(dp) :: kinetic = 0.0_dp
 
