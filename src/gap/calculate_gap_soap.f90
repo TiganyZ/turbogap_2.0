@@ -302,8 +302,8 @@ contains
          !       max_Gbytes_per_process (default = 1.d0)
 
          call get_number_of_atom_pairs( &
-            neighbors%n_neigh(split%i_beg:split%i_end), &
-            neighbors%rjs(split%j_beg:split%j_end), &
+            neighbors%n_neigh%array(split%i_beg:split%i_end), &
+            neighbors%rjs%array(split%j_beg:split%j_end), &
             soap_turbo_hypers(i)%rcut_max, &
             soap_turbo_hypers(i)%l_max, &
             soap_turbo_hypers(i)%n_max, &
@@ -331,14 +331,14 @@ contains
 
             call get_gap_soap(state%n_sites, &
                               this_n_sites_mpi, &
-                              neighbors%n_neigh(this_i_beg:this_i_end), &
-                              neighbors%neighbors_list(this_j_beg:this_j_end), &
+                              neighbors%n_neigh%array(this_i_beg:this_i_end), &
+                              neighbors%neighbors_list%array(this_j_beg:this_j_end), &
                               soap_turbo_hypers(i)%n_species, &
                               soap_turbo_hypers(i)%species_types, &
-                              neighbors%rjs(this_j_beg:this_j_end), &
-                              neighbors%thetas(this_j_beg:this_j_end), &
-                              neighbors%phis(this_j_beg:this_j_end), &
-                              neighbors%xyz(1:3, this_j_beg:this_j_end), &
+                              neighbors%rjs%array(this_j_beg:this_j_end), &
+                              neighbors%thetas%array(this_j_beg:this_j_end), &
+                              neighbors%phis%array(this_j_beg:this_j_end), &
+                              neighbors%xyz%array(1:3, this_j_beg:this_j_end), &
                               soap_turbo_hypers(i)%alpha_max, &
                               soap_turbo_hypers(i)%l_max, &
                               soap_turbo_hypers(i)%dim, &

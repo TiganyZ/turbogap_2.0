@@ -28,6 +28,7 @@
 
 module types
    use kinds, only: dp
+   use tg_memory, only: tg_array_1_dp, tg_array_2_dp, tg_array_1_int, tg_array_1_logical
    implicit none
   !! This file contains the general types which are operated on by TurboGAP
   !! State is the main state of the program, which contains the positions,
@@ -89,19 +90,22 @@ module types
       real(dp) :: rcut_max = 4.0_dp
       real(dp) :: buffer = 0.0_dp
 
-      real(dp), allocatable :: rjs(:)
-      real(dp), allocatable :: phis(:)
-      real(dp), allocatable :: thetas(:)
-      real(dp), allocatable :: xyz(:, :)
+      !! Tracked, overallocation-aware buffers: see tg_memory (src/allocation/).
+      !! %array is the underlying data; %used_dims(1) is the logical extent
+      !! (e.g. neighbors%n_atom_pairs), which may be smaller than the physical
+      !! capacity %dims(1) when the buffer has been overallocated to avoid churn.
+      type(tg_array_1_dp) :: rjs
+      type(tg_array_1_dp) :: phis
+      type(tg_array_1_dp) :: thetas
+      type(tg_array_2_dp) :: xyz
 
-      integer, allocatable  :: n_neigh(:)
-      integer, allocatable  :: n_neigh_global(:)
-      integer, allocatable  :: neighbor_species(:)
-      integer, allocatable  :: neighbors_list(:)
-      integer, allocatable  :: neighbors_list_temp(:)
+      type(tg_array_1_int) :: n_neigh
+      type(tg_array_1_int) :: n_neigh_global
+      type(tg_array_1_int) :: neighbor_species
+      type(tg_array_1_int) :: neighbors_list
       integer, allocatable  :: n_atom_pairs_by_rank(:)
       integer, allocatable  :: n_atom_pairs_by_rank_prev(:)
-      logical, allocatable  :: do_list(:)
+      type(tg_array_1_logical) :: do_list
       type(memory_t) :: memory
    end type neighbors_t
 

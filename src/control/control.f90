@@ -131,6 +131,7 @@ module control
 
                                                                         !! Debug
       logical :: print_lp_forces = .false.
+      logical :: print_memory = .false.
       logical :: print_progress = .true.
       logical :: print_vdw_forces = .false.
 

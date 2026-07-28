@@ -67,9 +67,9 @@ contains
          v_neigh_vdw = 0.d0
          k = 0
          do i = split%i_beg, split%i_end
-            do j = 1, neighbors%n_neigh(i)
+            do j = 1, neighbors%n_neigh%array(i)
                !           I'm not sure if this is necessary or neighbors_list is already bounded between 1 and n_sites -> CHECK THIS
-               j2 = mod(neighbors%neighbors_list(split%j_beg + k) - 1, state%n_sites) + 1
+               j2 = mod(neighbors%neighbors_list%array(split%j_beg + k) - 1, state%n_sites) + 1
                k = k + 1
                !                 v_neigh_vdw(k) = hirshfeld_v(j2)
                v_neigh_vdw(k) = state%local_properties(j2, lp_indexes%hirshfeld_v)
@@ -85,15 +85,15 @@ contains
                                        n_pairs_local, &
                                        species_info%n_species, &
                                        state%n_sites, &
-                                       neighbors%n_neigh(split%i_beg:split%i_end), &
-                                       neighbors%neighbors_list, &
-                                       neighbors%neighbor_species, &
+                                       neighbors%n_neigh%array(split%i_beg:split%i_end), &
+                                       neighbors%neighbors_list%array, &
+                                       neighbors%neighbor_species%array, &
                                        options_vdw%rcut, &
                                        options_vdw%buffer, &
                                        options_vdw%rcut_inner, &
                                        options_vdw%buffer_inner, &
-                                       neighbors%rjs, &
-                                       neighbors%xyz, &
+                                       neighbors%rjs%array, &
+                                       neighbors%xyz%array, &
                                        v_neigh_vdw, &
                                        options_vdw%sR, &
                                        options_vdw%d, &

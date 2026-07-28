@@ -85,6 +85,7 @@ module turbogap_main
    !   Params_XPS, Params_XRD, Params_PDF, Params_EXP
 
    use neighbors_interface, only: build_neighbors_list, collect_neighbors, deallocate_neighbors
+   use tg_memory, only: tg_print_memory
 
    use calculate_gap_soap_mod, only: calculate_gap_soap, calculate_e0, reset_local_properties
    use gap, only: calculate_gap_2b, calculate_gap_3b, calculate_gap_core_pot
@@ -1128,9 +1129,11 @@ contains
          neighbors%n_atom_pairs_prev = neighbors%n_atom_pairs
 
          if (do_%rebuild_neighbors_list) then
+            if (do_%print_memory) call tg_print_memory("neighbors", neighbors%memory%total, neighbors%memory%max, rank)
+
             neighbors_rcut_max = neighbors%rcut_max
             neighbors_rcut_buffer = neighbors%buffer
-            call deallocate_neighbors(neighbors)
+            call deallocate_neighbors(neighbors, rank)
 
             neighbors%rcut_max = neighbors_rcut_max
             neighbors%buffer = neighbors_rcut_buffer

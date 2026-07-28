@@ -207,6 +207,13 @@ contains
             call print_parameter("do_print_lp_forces", do_%print_lp_forces)
          call check_iostatus(iostatus, keyword)
          keyword_found = .true.
+      else if (trim(keyword) == "print_memory") then
+         backspace (unit)
+         read (unit, *, iostat=iostatus) cjunk, cjunk, do_%print_memory
+         if (rank == 0) &
+            call print_parameter("do_print_memory", do_%print_memory)
+         call check_iostatus(iostatus, keyword)
+         keyword_found = .true.
       else if (trim(keyword) == "print_progress") then
          backspace (unit)
          read (unit, *, iostat=iostatus) cjunk, cjunk, do_%print_progress

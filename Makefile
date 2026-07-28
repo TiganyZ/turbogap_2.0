@@ -30,6 +30,7 @@ SRC := kinds.f90 \
        constants.f90 \
        error.f90 \
        printing.f90 \
+       tg_memory.f90 \
        types.f90 \
        timer.f90 \
        control.f90 \
@@ -154,6 +155,9 @@ $(BUILD_DIR)/%.o: src/neighbors/%.f90 | $$(@D)
 	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: src/types/%.f90 | $$(@D)
+	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: src/allocation/%.f90 | $$(@D)
 	$(F90) $(PP) $(F90_OPTS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: src/utils/%.f90 | $$(@D)

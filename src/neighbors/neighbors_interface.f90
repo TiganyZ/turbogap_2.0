@@ -33,7 +33,7 @@ module neighbors_interface
    use timing, only: time_start, time_end
    use printing, only: print_debug, print_parameter
    use mpi
-   ! use tg_memory, only: tg_allocate, tg_deallocate
+   use tg_memory, only: tg_alloc, tg_dealloc
    implicit none
 
 contains
@@ -42,34 +42,28 @@ contains
 ! This subroutine reads in the XYZ file and builds the lists of neighbors, the spherical
 ! coordinates, etc.
 !
-   subroutine deallocate_neighbors(neighbors)
-      type(neighbors_t), intent(out) :: neighbors
+   subroutine deallocate_neighbors(neighbors, rank)
+      !! NOTE: intent(inout), not intent(out). With intent(out), Fortran wipes
+      !! every allocatable component of neighbors (and resets neighbors%memory's
+      !! default-initialized fields to 0) the instant this subroutine is
+      !! invoked, before any of the tg_dealloc calls below could run or
+      !! decrement anything - almost certainly why this block used to be
+      !! commented out.
+      type(neighbors_t), intent(inout) :: neighbors
+      integer, intent(in) :: rank
 
-      ! call tg_deallocate( neighbors%rjs                       , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "rjs" )
-      ! call tg_deallocate( neighbors%phis                      , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "phis" )
-      ! call tg_deallocate( neighbors%thetas                    , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "thetas" )
-      ! call tg_deallocate( neighbors%xyz                       , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "xyz" )
-      ! call tg_deallocate( neighbors%n_neigh                   , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "n_neigh" )
-      ! call tg_deallocate( neighbors%n_neigh_global            , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "n_neigh_global" )
-      ! call tg_deallocate( neighbors%neighbor_species          , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "neighbor_species" )
-      ! call tg_deallocate( neighbors%neighbors_list            , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "neighbors_list" )
-      ! call tg_deallocate( neighbors%neighbors_list_temp       , neighbors &
-      !      &%memory%total, neighbors%memory%max, rank, "neighbors_list_temp" )
-      ! call tg_deallocate( neighbors%n_atom_pairs_by_rank      , neighbors&
-      !      &%memory%total, neighbors%memory%max, rank, "n_atom_pairs_by_rank" )
-      ! call tg_deallocate( neighbors%n_atom_pairs_by_rank_prev , neighbors&
-      !      &%memory%total, neighbors%memory%max, rank,&
-      !      & "n_atom_pairs_by_rank_prev" )
-      ! call tg_deallocate( neighbors%do_list                   , neighbors&
-      !      &%memory%total, neighbors%memory%max, rank, "do_list" )
+      call tg_dealloc(neighbors%rjs, neighbors%memory%total, rank, "neighbors%rjs")
+      call tg_dealloc(neighbors%phis, neighbors%memory%total, rank, "neighbors%phis")
+      call tg_dealloc(neighbors%thetas, neighbors%memory%total, rank, "neighbors%thetas")
+      call tg_dealloc(neighbors%xyz, neighbors%memory%total, rank, "neighbors%xyz")
+      call tg_dealloc(neighbors%n_neigh, neighbors%memory%total, rank, "neighbors%n_neigh")
+      call tg_dealloc(neighbors%n_neigh_global, neighbors%memory%total, rank, "neighbors%n_neigh_global")
+      call tg_dealloc(neighbors%neighbor_species, neighbors%memory%total, rank, "neighbors%neighbor_species")
+      call tg_dealloc(neighbors%neighbors_list, neighbors%memory%total, rank, "neighbors%neighbors_list")
+      call tg_dealloc(neighbors%do_list, neighbors%memory%total, rank, "neighbors%do_list")
+
+      if (allocated(neighbors%n_atom_pairs_by_rank)) deallocate (neighbors%n_atom_pairs_by_rank)
+      if (allocated(neighbors%n_atom_pairs_by_rank_prev)) deallocate (neighbors%n_atom_pairs_by_rank_prev)
 
    end subroutine deallocate_neighbors
 !
@@ -106,19 +100,34 @@ contains
          ! neighbors%n_atom_pairs = neighbors%n_atom_pairs_total
 
          !     Get number of neighbors
-         if (.not. allocated(neighbors%n_neigh_global)) &
-            allocate (neighbors%n_neigh_global(1:n_sites))
+         if (.not. neighbors%n_neigh_global%allocated) &
+            call tg_alloc(neighbors%n_neigh_global, [n_sites], &
+                          neighbors%memory%total, neighbors%memory%max, rank, "neighbors%n_neigh_global")
 
-         call mpi_reduce(neighbors%n_neigh, neighbors%n_neigh_global, &
+         call mpi_reduce(neighbors%n_neigh%array, neighbors%n_neigh_global%array, &
                          n_sites, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-         if (.not. allocated(neighbors%n_neigh)) &
-            allocate (neighbors%n_neigh(1:n_sites))
+         if (.not. neighbors%n_neigh%allocated) &
+            call tg_alloc(neighbors%n_neigh, [n_sites], &
+                          neighbors%memory%total, neighbors%memory%max, rank, "neighbors%n_neigh")
 
-         if (rank == 0) &
-            call move_alloc(neighbors%n_neigh_global, neighbors%n_neigh)
+         if (rank == 0) then
+            ! Transfer ownership of n_neigh_global's buffer into n_neigh (replacing
+            ! n_neigh's own buffer) without double-counting either in memory%total:
+            ! free n_neigh's old buffer via tg_dealloc first, then move the already
+            ! tracked n_neigh_global buffer across and clear n_neigh_global's
+            ! bookkeeping (its bytes are now accounted for under n_neigh).
+            call tg_dealloc(neighbors%n_neigh, neighbors%memory%total, rank, "neighbors%n_neigh")
+            call move_alloc(neighbors%n_neigh_global%array, neighbors%n_neigh%array)
+            neighbors%n_neigh%dims = neighbors%n_neigh_global%dims
+            neighbors%n_neigh%used_dims = neighbors%n_neigh_global%used_dims
+            neighbors%n_neigh%allocated = .true.
+            neighbors%n_neigh_global%dims = 0
+            neighbors%n_neigh_global%used_dims = 0
+            neighbors%n_neigh_global%allocated = .false.
+         end if
 
-         call mpi_bcast(neighbors%n_neigh, n_sites, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+         call mpi_bcast(neighbors%n_neigh%array, n_sites, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
          call time_end(time_mpi)
 
@@ -161,14 +170,21 @@ contains
          call time_start(time_neigh)
       end if
 
-      if (.not. allocated(neighbors%do_list)) then
-         allocate (neighbors%do_list(1:state%n_sites))
-         neighbors%do_list = .false.
-      end if
+      block
+         logical :: do_list_was_allocated
+         do_list_was_allocated = neighbors%do_list%allocated
+         ! tg_alloc is safe to call every step (unlike allocate, which would
+         ! error on an already-allocated array): it only regrows do_list when
+         ! state%n_sites exceeds the current physical capacity, and reuses the
+         ! existing buffer otherwise.
+         call tg_alloc(neighbors%do_list, [state%n_sites], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%do_list")
+         if (.not. do_list_was_allocated) neighbors%do_list%array = .false.
+      end block
 #ifdef _MPIF90
-      neighbors%do_list(split%i_beg:split%i_end) = .true.
+      neighbors%do_list%array(split%i_beg:split%i_end) = .true.
 #else
-      neighbors%do_list = .true.
+      neighbors%do_list%array = .true.
 #endif
 
       state%n_sites_supercell = size(state%positions, 2)
@@ -261,8 +277,12 @@ contains
       !   store the lists back to it
       if (rebuild_neighbors) then
          neighbors%n_neigh_max = 100
-         allocate (neighbors%neighbors_list(1:neighbors%n_neigh_max*state%n_sites), source=0)
-         allocate (neighbors%n_neigh(1:state%n_sites), source=0)
+         call tg_alloc(neighbors%neighbors_list, [neighbors%n_neigh_max*state%n_sites], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%neighbors_list")
+         neighbors%neighbors_list%array = 0
+         call tg_alloc(neighbors%n_neigh, [state%n_sites], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%n_neigh")
+         neighbors%n_neigh%array = 0
          neighbors%n_atom_pairs = 0
       end if
       !   We have an efficient algorithm for square boxes and inefficient for non-square boxes (sorry!)
@@ -306,14 +326,14 @@ contains
             head(j) = i
          end do
          do i = 1, state%n_sites
-            if (neighbors%do_list(i)) then
+            if (neighbors%do_list%array(i)) then
                !         We always count atom i as its own neighbor. This is useful when building the derivatives
-               neighbors%n_neigh(i) = neighbors%n_neigh(i) + 1
+               neighbors%n_neigh%array(i) = neighbors%n_neigh%array(i) + 1
                neighbors%n_atom_pairs = neighbors%n_atom_pairs + 1
 
-               call check_extend_neighbor_list(neighbors, state%n_sites, 10)
+               call check_extend_neighbor_list(neighbors, state%n_sites, 10, rank)
 
-               neighbors%neighbors_list(neighbors%n_atom_pairs) = i
+               neighbors%neighbors_list%array(neighbors%n_atom_pairs) = i
                !         Cell coordinates for this atom
                call get_distance([state%a_box(1)/2.d0, state%b_box(2)/2.d0,&
                     & state%c_box(3)/2.d0], state%positions(1:3, i), state%&
@@ -346,12 +366,12 @@ contains
                                    & state%b_box(1:3), state%c_box(1:3), &
                                    &(/.true., .true., .true./), dist, d, i_shift)
                               if (d < neighbors%rcut_max) then
-                                 neighbors%n_neigh(i) = neighbors%n_neigh(i) + 1
+                                 neighbors%n_neigh%array(i) = neighbors%n_neigh%array(i) + 1
                                  neighbors%n_atom_pairs = neighbors%n_atom_pairs + 1
 
-                                 call check_extend_neighbor_list(neighbors, state%n_sites, 10)
+                                 call check_extend_neighbor_list(neighbors, state%n_sites, 10, rank)
 
-                                 neighbors%neighbors_list(neighbors%n_atom_pairs) = k
+                                 neighbors%neighbors_list%array(neighbors%n_atom_pairs) = k
                               end if
                            end if
                            k = this_list(k)
@@ -365,14 +385,14 @@ contains
          !   Very inefficient algorithm for non-square boxes
       else if (rebuild_neighbors) then
          do i = 1, state%n_sites
-            if (neighbors%do_list(i)) then
+            if (neighbors%do_list%array(i)) then
                !         We always count atom i as its own neighbor. This is useful when building the derivatives
-               neighbors%n_neigh(i) = neighbors%n_neigh(i) + 1
+               neighbors%n_neigh%array(i) = neighbors%n_neigh%array(i) + 1
                neighbors%n_atom_pairs = neighbors%n_atom_pairs + 1
 
-               call check_extend_neighbor_list(neighbors, state%n_sites, 10)
+               call check_extend_neighbor_list(neighbors, state%n_sites, 10, rank)
 
-               neighbors%neighbors_list(neighbors%n_atom_pairs) = i
+               neighbors%neighbors_list%array(neighbors%n_atom_pairs) = i
 
                do j = 1, state%n_sites_supercell
                   if (j /= i) then
@@ -381,14 +401,14 @@ contains
                           & b_box(1:3), state%c_box(1:3), (/.true., .true.,&
                           & .true./), dist, d, i_shift)
                      if (d < neighbors%rcut_max) then
-                        neighbors%n_neigh(i) = neighbors%n_neigh(i) + 1
+                        neighbors%n_neigh%array(i) = neighbors%n_neigh%array(i) + 1
                         neighbors%n_atom_pairs = neighbors%n_atom_pairs + 1
 
-                        call check_extend_neighbor_list(neighbors, state%n_sites, 10)
+                        call check_extend_neighbor_list(neighbors, state%n_sites, 10, rank)
                         !                j2 = mod(j-1, state % n_sites) + 1
                         !                neighbors % neighbors_list(neighbors %
                         !                n_atom_pairs) = j2
-                        neighbors%neighbors_list(neighbors%n_atom_pairs) = j
+                        neighbors%neighbors_list%array(neighbors%n_atom_pairs) = j
                      end if
                   end if
                end do
@@ -397,10 +417,12 @@ contains
       end if
 
       if (rebuild_neighbors) then
-         allocate (neighbors%neighbors_list_temp(1:neighbors%n_atom_pairs))
-         neighbors%neighbors_list_temp = neighbors%neighbors_list(1:neighbors%n_atom_pairs)
-         call move_alloc(neighbors%neighbors_list_temp, &
-                         neighbors%neighbors_list)
+         ! Trim neighbors_list's *logical* extent down to n_atom_pairs. tg_alloc
+         ! requesting a smaller size than the current physical capacity just
+         ! updates used_dims - no copy/move_alloc needed, unlike the old
+         ! allocate-temp/copy/move_alloc dance this replaces.
+         call tg_alloc(neighbors%neighbors_list, [neighbors%n_atom_pairs], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%neighbors_list")
       end if
 
       if (do_timing) then
@@ -418,29 +440,38 @@ contains
       !
       neighbors%n_atom_pairs = 0
       do i = 1, state%n_sites
-         neighbors%n_atom_pairs = neighbors%n_atom_pairs + neighbors%n_neigh(i)
+         neighbors%n_atom_pairs = neighbors%n_atom_pairs + neighbors%n_neigh%array(i)
       end do
       !    allocate( mask_species(1:neighbors % n_atom_pairs, 1:n_species) )
       !    mask_species = .false.
       if (rebuild_neighbors) then
-         allocate (neighbors%rjs(1:neighbors%n_atom_pairs))
-         allocate (neighbors%xyz(1:3, 1:neighbors%n_atom_pairs))
-         allocate (neighbors%thetas(1:neighbors%n_atom_pairs))
-         allocate (neighbors%phis(1:neighbors%n_atom_pairs))
-         allocate (neighbors%neighbor_species(1:neighbors%n_atom_pairs))
+         ! Every consumer of these arrays (gap.f90, calculate_gap_soap.f90,
+         ! vdw_interface.f90) slices them by an explicit n_atom_pairs-derived
+         ! range, never by size(), so it's safe to let tg_alloc overallocate
+         ! and skip reallocation when n_atom_pairs doesn't grow between rebuilds.
+         call tg_alloc(neighbors%rjs, [neighbors%n_atom_pairs], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%rjs")
+         call tg_alloc(neighbors%xyz, [3, neighbors%n_atom_pairs], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%xyz")
+         call tg_alloc(neighbors%thetas, [neighbors%n_atom_pairs], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%thetas")
+         call tg_alloc(neighbors%phis, [neighbors%n_atom_pairs], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%phis")
+         call tg_alloc(neighbors%neighbor_species, [neighbors%n_atom_pairs], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%neighbor_species")
       end if
       k2 = 0
       do i = 1, state%n_sites
-         if (neighbors%do_list(i)) then
-            do k = 1, neighbors%n_neigh(i)
+         if (neighbors%do_list%array(i)) then
+            do k = 1, neighbors%n_neigh%array(i)
                k2 = k2 + 1
-               j = neighbors%neighbors_list(k2)
+               j = neighbors%neighbors_list%array(k2)
                if (k == 1) then
-                  neighbors%rjs(k2) = 0.d0
-                  neighbors%xyz(1:3, k2) = (/0.d0, 0.d0, 0.d0/)
-                  neighbors%thetas(k2) = 0.d0
-                  neighbors%phis(k2) = 0.d0
-                  neighbors%neighbor_species(k2) = state%species_supercell(i)
+                  neighbors%rjs%array(k2) = 0.d0
+                  neighbors%xyz%array(1:3, k2) = (/0.d0, 0.d0, 0.d0/)
+                  neighbors%thetas%array(k2) = 0.d0
+                  neighbors%phis%array(k2) = 0.d0
+                  neighbors%neighbor_species%array(k2) = state%species_supercell(i)
                   !            do i2 = 1, species_multiplicity(i)
                   !              mask_species(k2, state % species_supercell(i2, j)) = .true.
                   !            end do
@@ -449,20 +480,20 @@ contains
                        &%positions(1:3, j), state%a_box(1:3), state%b_box(1:3),&
                        & state%c_box(1:3), (/.true., .true., .true./), dist, d,&
                        & i_shift)
-                  neighbors%rjs(k2) = d
-                  neighbors%xyz(1:3, k2) = dist
+                  neighbors%rjs%array(k2) = d
+                  neighbors%xyz%array(1:3, k2) = dist
                   !           Avoid numerical artifacts
                   if (dabs(dist(3)) >= d) then
                      if (dist(3) > 0.d0) then
-                        neighbors%thetas(k2) = 0.d0
+                        neighbors%thetas%array(k2) = 0.d0
                      else
-                        neighbors%thetas(k2) = dacos(-1.d0)
+                        neighbors%thetas%array(k2) = dacos(-1.d0)
                      end if
                   else
-                     neighbors%thetas(k2) = dacos(dist(3)/d)
+                     neighbors%thetas%array(k2) = dacos(dist(3)/d)
                   end if
-                  neighbors%phis(k2) = datan2(dist(2), dist(1))
-                  neighbors%neighbor_species(k2) = state%species_supercell(j)
+                  neighbors%phis%array(k2) = datan2(dist(2), dist(1))
+                  neighbors%neighbor_species%array(k2) = state%species_supercell(j)
                   !            do i2 = 1, species_multiplicity(i)
                   !              mask_species(k2, state % species_supercell(i2,
                   !              j)) = .true.
@@ -470,7 +501,7 @@ contains
                end if
             end do
          else
-            k2 = k2 + neighbors%n_neigh(i)
+            k2 = k2 + neighbors%n_neigh%array(i)
          end if
       end do
 
@@ -488,20 +519,19 @@ contains
       end if
    end subroutine build_neighbors_list
 
-   subroutine check_extend_neighbor_list(neighbors, n_sites, n_extra_pairs)
+   subroutine check_extend_neighbor_list(neighbors, n_sites, n_extra_pairs, rank)
       type(neighbors_t), intent(inout) :: neighbors
       integer, intent(in) :: n_sites
       integer, intent(in) :: n_extra_pairs
-      if (neighbors%n_atom_pairs > neighbors%n_neigh_max*&
-           & n_sites) then
-         allocate (neighbors%neighbors_list_temp(1:(neighbors%&
-              & n_neigh_max + n_extra_pairs)*n_sites))
-         neighbors%neighbors_list_temp(1:neighbors%n_atom_pairs - 1)&
-              & = neighbors%neighbors_list(1:neighbors%n_atom_pairs &
-              &- 1)
-         call move_alloc(neighbors%neighbors_list_temp, &
-                         neighbors%neighbors_list)
+      integer, intent(in) :: rank
+
+      if (neighbors%n_atom_pairs > neighbors%n_neigh_max*n_sites) then
          neighbors%n_neigh_max = neighbors%n_neigh_max + n_extra_pairs
+         ! tg_alloc preserves existing contents (up to the overlap) when it
+         ! regrows a tg_array, so this is just a plain grow request - no more
+         ! manual allocate-temp/copy/move_alloc needed.
+         call tg_alloc(neighbors%neighbors_list, [neighbors%n_neigh_max*n_sites], &
+                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%neighbors_list")
       end if
    end subroutine check_extend_neighbor_list
 
