@@ -28,7 +28,7 @@
 
 module exp_types
    use kinds, only: dp
-   use tg_memory, only: tg_array_1_dp, tg_array_2_dp
+   use tg_memory, only: tg_array_1_dp, tg_array_2_dp, tg_array_3_dp
    implicit none
 
    !****************************************************************************
@@ -125,6 +125,20 @@ module exp_types
       type(tg_array_1_dp)  :: x
       type(tg_array_1_dp)  :: y
       type(tg_array_2_dp)  :: y_der
+
+      !! Per-species-pair partial pair distribution functions g_ab(r),
+      !! dimension 2 indexed by n_dim_idx = 1..n_species*(n_species+1)/2 in
+      !! (a,b) row-major order with a<=b (see calculate_pdf.f90's
+      !! `do a = 1, n_species; do b = a, n_species` loop - every consumer of
+      !! this array must iterate in that exact order to agree on n_dim_idx).
+      !! Only computed when %partial is true AND sf/xrd/nd are active (pdf's
+      !! own energy/force bias uses the total-only x/y/y_der above
+      !! regardless - see calculate_pdf.f90's module comment for why that's
+      !! equivalent, not a simplification). partial_der is the dominant
+      !! memory cost here (O(n_samples * n_dim_partial * n_pairs)), same
+      !! reasoning as y_der above.
+      type(tg_array_2_dp)  :: g_partial
+      type(tg_array_3_dp)  :: partial_der
    end type pdf_t
 
    !****************************************************************************
@@ -136,6 +150,34 @@ module exp_types
       logical               :: matrix_forces = .true.
       logical               :: window = .true.
       real(dp)              :: rcut = 4.d0
+                        !! Read for input-file compatibility with the
+                        !! original TurboGAP's q_units ("q"/"saxs" vs.
+                        !! "xrd"/"twotheta" 2*theta-degree input), but not
+                        !! yet applied - range_min/range_max are always
+                        !! interpreted directly as "small q" = Q/(2 pi)
+                        !! (1/Angstrom), the convention used internally
+                        !! throughout this module. Implementing the
+                        !! degree-based conversion needs xrd_t%wavelength,
+                        !! which isn't naturally available at this level.
+      character*32          :: q_units = "q"
+
+      !! Predicted structure-factor curve, tg_memory-tracked like pdf_t's
+      !! x/y/y_der (see pdf_t above). y_der here holds the *chain-ruled*
+      !! dS(q)/dpair derivative (built from pdf's own y_der via the sinc
+      !! transform, see calculate_sf.f90), not a fresh per-pair KDE
+      !! derivative - same O(n_samples * n_pairs) memory profile as pdf's.
+      type(tg_array_1_dp)  :: x
+      type(tg_array_1_dp)  :: y
+      type(tg_array_2_dp)  :: y_der
+
+      !! Per-species-pair S_ab(q) (same n_dim_idx ordering as pdf_t%g_partial)
+      !! - delta_ab + 4*pi*cabh*rho*[sinc transform of g_ab - 1], i.e.
+      !! *before* the concentration-weighted combination into the total
+      !! y above. Consumed directly by calculate_xrd.f90 (xrd/nd are built
+      !! from this, not from pdf_t%g_partial again) - matches the original
+      !! TurboGAP's calculate_xrd taking structure_factor_partial as an
+      !! input argument computed by calculate_structure_factor.
+      type(tg_array_2_dp)  :: s_partial
    end type sf_t
 
    !****************************************************************************
@@ -145,6 +187,31 @@ module exp_types
       real(dp)              :: rcut = 4.d0
                                               !! Cu K alpha radiation wavelength
       real(dp)              :: wavelength = 1.5405981_dp
+
+      !! Read from the original TurboGAP's xrd_method/xrd_damping/xrd_alpha/
+      !! xrd_iwasa keywords for input-file compatibility, but currently
+      !! unused - this phase's XRD only implements the standard "xrd" output
+      !! (S_ab combination + self-scattering term, or the direct Debye sum
+      !! fallback), not the alternate damping/Iwasa-correction variants
+      !! those parameters feed in exp_utils::get_xrd_from_partial_structure_factors.
+      character*32          :: method = "default"
+      real(dp)              :: damping = 0.0_dp
+      real(dp)              :: alpha = 0.0_dp
+      logical               :: iwasa = .false.
+
+      !! Predicted I(q) curve, tg_memory-tracked like pdf_t's x/y/y_der.
+      !! When options_pdf%partial and options_sf%partial are both true,
+      !! y_der is built by chain-ruling through pdf%partial_der per species
+      !! pair (see calculate_xrd.f90, mirrors the original TurboGAP's
+      !! get_structure_factor_forces_matrix called with do_xrd=.true.);
+      !! otherwise it falls back to the direct Debye-sum per-pair derivative
+      !! from exp_math_utils::get_xrd_nd. The "debye" flag above is
+      !! currently a no-op - which path runs is decided by partial
+      !! availability, not by this flag (see calculate_xrd.f90's module
+      !! comment).
+      type(tg_array_1_dp)  :: x
+      type(tg_array_1_dp)  :: y
+      type(tg_array_2_dp)  :: y_der
    end type xrd_t
 
    !****************************************************************************
@@ -152,6 +219,18 @@ module exp_types
    type, extends(general_exp_t) :: nd_t
       logical               :: debye = .false.
       real(dp)              :: rcut = 4.d0
+
+      !! See xrd_t's method/damping/alpha/iwasa and x/y/y_der - identical
+      !! role, computed with neutron scattering lengths instead of X-ray
+      !! form factors.
+      character*32          :: method = "default"
+      real(dp)              :: damping = 0.0_dp
+      real(dp)              :: alpha = 0.0_dp
+      logical               :: iwasa = .false.
+
+      type(tg_array_1_dp)  :: x
+      type(tg_array_1_dp)  :: y
+      type(tg_array_2_dp)  :: y_der
    end type nd_t
 
    !****************************************************************************

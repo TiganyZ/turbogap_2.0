@@ -216,6 +216,14 @@ contains
             call print_parameter(trim(keyword), sf_opt%matrix_forces)
          call check_iostatus(iostatus, keyword)
 
+      else if (keyword == "structure_factor_q_units" .or. keyword == "q_units") then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, sf_opt%q_units
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), sf_opt%q_units)
+         call check_iostatus(iostatus, keyword)
+
       end if
    end subroutine read_sf_options
 
@@ -266,6 +274,34 @@ contains
          if (rank == 0) &
             call print_parameter(trim(keyword), xrd_opt%debye)
          call check_iostatus(iostatus, keyword)
+      else if (keyword == 'xrd_method') then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, xrd_opt%method
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), xrd_opt%method)
+         call check_iostatus(iostatus, keyword)
+      else if (keyword == 'xrd_damping') then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, xrd_opt%damping
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), xrd_opt%damping)
+         call check_iostatus(iostatus, keyword)
+      else if (keyword == 'xrd_alpha') then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, xrd_opt%alpha
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), xrd_opt%alpha)
+         call check_iostatus(iostatus, keyword)
+      else if (keyword == 'xrd_iwasa') then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, xrd_opt%iwasa
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), xrd_opt%iwasa)
+         call check_iostatus(iostatus, keyword)
       end if
 
    end subroutine read_xrd_options
@@ -309,6 +345,34 @@ contains
          keyword_found = .true.
          if (rank == 0) &
             call print_parameter(trim(keyword), nd_opt%debye)
+         call check_iostatus(iostatus, keyword)
+      else if (keyword == 'nd_method') then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, nd_opt%method
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), nd_opt%method)
+         call check_iostatus(iostatus, keyword)
+      else if (keyword == 'nd_damping') then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, nd_opt%damping
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), nd_opt%damping)
+         call check_iostatus(iostatus, keyword)
+      else if (keyword == 'nd_alpha') then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, nd_opt%alpha
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), nd_opt%alpha)
+         call check_iostatus(iostatus, keyword)
+      else if (keyword == 'nd_iwasa') then
+         backspace (input)
+         read (input, *, iostat=iostatus) cjunk, cjunk, nd_opt%iwasa
+         keyword_found = .true.
+         if (rank == 0) &
+            call print_parameter(trim(keyword), nd_opt%iwasa)
          call check_iostatus(iostatus, keyword)
       end if
    end subroutine read_nd_options
@@ -388,6 +452,8 @@ contains
          exp_opt%range_min = 1.0_dp
          allocate (exp_opt%range_max(exp_opt%n_exp))
          exp_opt%range_max = 1.0_dp
+         allocate (exp_opt%label(exp_opt%n_exp))
+         exp_opt%label = "none"
 
       else if (keyword == "exp_data_files") then
          backspace (input)
@@ -398,7 +464,7 @@ contains
          call check_iostatus(iostatus, keyword)
 
          do nw = 1, exp_opt%n_exp
-            call check_file_exists(exp_opt%file(i))
+            call check_file_exists(exp_opt%file(nw))
             if (trim(exp_opt%file(nw)) == "none") then
                ! Make sure that no type of exp data is written
                exp_data(nw)%compute_exp = .false.
@@ -425,7 +491,7 @@ contains
          call check_iostatus(iostatus, keyword)
 
          do nw = 1, exp_opt%n_exp
-            call check_file_exists(exp_opt%file_weights(i))
+            call check_file_exists(exp_opt%file_weights(nw))
             if (trim(exp_opt%file_weights(nw)) == "none") then
                ! Make sure that no type of exp data is written
                exp_data(nw)%has_weights = .false.

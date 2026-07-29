@@ -44,6 +44,7 @@ SRC := kinds.f90 \
        mc_types.f90 \
        vdw_types.f90 \
        exp_types.f90 \
+       scattering_factors.f90 \
        exp_math_utils.f90 \
        \
        soap_turbo_functions.f90 \
@@ -76,6 +77,8 @@ SRC := kinds.f90 \
        read_files.f90 \
        \
        calculate_pdf.f90 \
+       calculate_sf.f90 \
+       calculate_xrd.f90 \
        \
        local_properties.f90 \
        gap.f90 \

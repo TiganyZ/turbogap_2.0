@@ -7,9 +7,12 @@ src/gap/gap_interface.f90
 src/gap/local_properties.f90
 src/gap/read_gap.f90
 src/madlib/calculate_pdf.f90
+src/madlib/calculate_sf.f90
+src/madlib/calculate_xrd.f90
 src/madlib/exp_math_utils.f90
 src/madlib/exp_types.f90
 src/madlib/read_exp.f90
+src/madlib/scattering_factors.f90
 src/mc/mc_interface.f90
 src/mc/mc_types.f90
 src/mc/mc_utils.f90

@@ -68,7 +68,9 @@ contains
                                  this_gap_3b, &
                                  this_gap_core_pot, &
                                  this_pdf, &
+                                 this_sf, &
                                  this_xrd, &
+                                 this_nd, &
                                  this_xps, &
                                  this_vdw)
 
@@ -97,7 +99,9 @@ contains
       type(calculation_t), intent(inout) :: this_gap_3b
       type(calculation_t), intent(inout) :: this_gap_core_pot
       type(calculation_t), intent(inout) :: this_pdf
+      type(calculation_t), intent(inout) :: this_sf
       type(calculation_t), intent(inout) :: this_xrd
+      type(calculation_t), intent(inout) :: this_nd
       type(calculation_t), intent(inout) :: this_xps
       type(calculation_t), intent(inout) :: this_vdw
 
@@ -179,7 +183,9 @@ contains
                                     this_gap_3b, &
                                     this_gap_core_pot, &
                                     this_pdf, &
+                                    this_sf, &
                                     this_xrd, &
+                                    this_nd, &
                                     this_xps, &
                                     this_vdw, &
                                     memory_total, memory_max, rank)
@@ -219,7 +225,9 @@ contains
       type(calculation_t), intent(inout) :: this_gap_3b
       type(calculation_t), intent(inout) :: this_gap_core_pot
       type(calculation_t), intent(inout) :: this_pdf
+      type(calculation_t), intent(inout) :: this_sf
       type(calculation_t), intent(inout) :: this_xrd
+      type(calculation_t), intent(inout) :: this_nd
       type(calculation_t), intent(inout) :: this_xps
       type(calculation_t), intent(inout) :: this_vdw
 
@@ -261,12 +269,18 @@ contains
          call allocate_calculation(n_sites, pdf, do_forces, memory_total, memory_max, rank, "pdf")
          call allocate_calculation(n_sites, this_pdf, do_forces, memory_total, memory_max, rank, "this_pdf")
       end if
-      if (perform%sf) &
+      if (perform%sf) then
          call allocate_calculation(n_sites, sf, do_forces, memory_total, memory_max, rank, "sf")
-      if (perform%xrd) &
+         call allocate_calculation(n_sites, this_sf, do_forces, memory_total, memory_max, rank, "this_sf")
+      end if
+      if (perform%xrd) then
          call allocate_calculation(n_sites, xrd, do_forces, memory_total, memory_max, rank, "xrd")
-      if (perform%nd) &
+         call allocate_calculation(n_sites, this_xrd, do_forces, memory_total, memory_max, rank, "this_xrd")
+      end if
+      if (perform%nd) then
          call allocate_calculation(n_sites, nd, do_forces, memory_total, memory_max, rank, "nd")
+         call allocate_calculation(n_sites, this_nd, do_forces, memory_total, memory_max, rank, "this_nd")
+      end if
       if (perform%xps) &
          call allocate_calculation(n_sites, xps, do_forces, memory_total, memory_max, rank, "xps")
 
