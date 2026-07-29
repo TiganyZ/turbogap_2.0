@@ -67,6 +67,7 @@ contains
                                  this_gap_2b, &
                                  this_gap_3b, &
                                  this_gap_core_pot, &
+                                 this_pdf, &
                                  this_xrd, &
                                  this_xps, &
                                  this_vdw)
@@ -95,6 +96,7 @@ contains
       type(calculation_t), intent(inout) :: this_gap_2b
       type(calculation_t), intent(inout) :: this_gap_3b
       type(calculation_t), intent(inout) :: this_gap_core_pot
+      type(calculation_t), intent(inout) :: this_pdf
       type(calculation_t), intent(inout) :: this_xrd
       type(calculation_t), intent(inout) :: this_xps
       type(calculation_t), intent(inout) :: this_vdw
@@ -176,6 +178,7 @@ contains
                                     this_gap_2b, &
                                     this_gap_3b, &
                                     this_gap_core_pot, &
+                                    this_pdf, &
                                     this_xrd, &
                                     this_xps, &
                                     this_vdw, &
@@ -215,6 +218,7 @@ contains
       type(calculation_t), intent(inout) :: this_gap_2b
       type(calculation_t), intent(inout) :: this_gap_3b
       type(calculation_t), intent(inout) :: this_gap_core_pot
+      type(calculation_t), intent(inout) :: this_pdf
       type(calculation_t), intent(inout) :: this_xrd
       type(calculation_t), intent(inout) :: this_xps
       type(calculation_t), intent(inout) :: this_vdw
@@ -253,8 +257,12 @@ contains
       end if
 
       !! Allocate Experimental Calculations
-      if (perform%pdf) &
+      if (perform%pdf) then
          call allocate_calculation(n_sites, pdf, do_forces, memory_total, memory_max, rank, "pdf")
+         call allocate_calculation(n_sites, this_pdf, do_forces, memory_total, memory_max, rank, "this_pdf")
+      end if
+      if (perform%sf) &
+         call allocate_calculation(n_sites, sf, do_forces, memory_total, memory_max, rank, "sf")
       if (perform%xrd) &
          call allocate_calculation(n_sites, xrd, do_forces, memory_total, memory_max, rank, "xrd")
       if (perform%nd) &

@@ -28,6 +28,7 @@
 
 module exp_types
    use kinds, only: dp
+   use tg_memory, only: tg_array_1_dp, tg_array_2_dp
    implicit none
 
    !****************************************************************************
@@ -115,6 +116,15 @@ module exp_types
       logical               :: partial = .true.
       real(dp)              :: sigma = 0.d0
       real(dp)              :: rcut = 4.d0
+
+      !! Predicted pair-distribution curve and its derivative w.r.t. every
+      !! neighbor pair. Tracked via tg_memory (src/allocation/) so the
+      !! O(n_samples * n_pairs) derivative tensor reuses its physical
+      !! allocation across steps instead of reallocating whenever the local
+      !! neighbor-pair count fluctuates.
+      type(tg_array_1_dp)  :: x
+      type(tg_array_1_dp)  :: y
+      type(tg_array_2_dp)  :: y_der
    end type pdf_t
 
    !****************************************************************************

@@ -178,6 +178,11 @@ contains
          backspace (input)
          read (input, *, iostat=iostatus) cjunk, cjunk, do_%sf
          keyword_found = .true.
+         ! The structure factor is built on top of the pair distribution
+         ! function (see calculate_structure_factor), so requesting one
+         ! implies the other - matches the original TurboGAP's read_files.f90
+         ! forcing (do_structure_factor/do_xrd/do_nd => do_pair_distribution).
+         if (do_%sf) do_%pdf = .true.
          if (rank == 0) &
             call print_parameter(trim(keyword), do_%sf)
          call check_iostatus(iostatus, keyword)
@@ -230,6 +235,13 @@ contains
          backspace (input)
          read (input, *, iostat=iostatus) cjunk, cjunk, do_%xrd
          keyword_found = .true.
+         ! XRD is built on top of the structure factor, which is built on
+         ! top of the pair distribution function - see the equivalent note
+         ! in read_sf_options.
+         if (do_%xrd) then
+            do_%sf = .true.
+            do_%pdf = .true.
+         end if
          if (rank == 0) &
             call print_parameter(trim(keyword), do_%xrd)
          call check_iostatus(iostatus, keyword)
@@ -274,6 +286,12 @@ contains
          backspace (input)
          read (input, *, iostat=iostatus) cjunk, cjunk, do_%nd
          keyword_found = .true.
+         ! Neutron diffraction is built on top of the structure factor, same
+         ! as XRD - see the equivalent note in read_sf_options.
+         if (do_%nd) then
+            do_%sf = .true.
+            do_%pdf = .true.
+         end if
          if (rank == 0) &
             call print_parameter(trim(keyword), do_%nd)
          call check_iostatus(iostatus, keyword)

@@ -92,6 +92,8 @@ module turbogap_main
 
    use vdw_interface, only: get_vdw_energy_and_forces
 
+   use calculate_pdf_mod, only: calculate_pdf
+
 #ifdef _MPIF90
    use mpi
    use mpi_utils, only: collect_calculation, broadcast_md, broadcast_mc, broadcast_state, synchronize_state
@@ -212,6 +214,7 @@ contains
       type(calculation_t) :: this_gap_2b
       type(calculation_t) :: this_gap_3b
       type(calculation_t) :: this_gap_core_pot
+      type(calculation_t) :: this_pdf
       type(calculation_t) :: this_xrd
       type(calculation_t) :: this_xps
       type(calculation_t) :: this_vdw
@@ -686,6 +689,7 @@ contains
                                        this_total, &
                                        this_gap_soap, this_gap_2b, this_gap_3b, &
                                        this_gap_core_pot, &
+                                       this_pdf, &
                                        this_xrd, this_xps, this_vdw, &
                                        calc_memory%total, calc_memory%max, rank)
          else
@@ -698,6 +702,7 @@ contains
                                     this_total, &
                                     this_gap_soap, this_gap_2b, this_gap_3b, &
                                     this_gap_core_pot, &
+                                    this_pdf, &
                                     this_xrd, this_xps, this_vdw)
 
          end if
@@ -852,6 +857,12 @@ contains
          !*************************************************************************
                                                                           !! pdf
 
+         if (perform%pdf) then
+            call calculate_pdf(state, neighbors, split, do_, md, mc, &
+                               options_exp, exp_data, options_pdf, &
+                               this_pdf, pdf, calc_memory%total, calc_memory%max, rank, time%pdf)
+         end if
+
 #ifdef _DEBUG
          call print_debug("Finished pdf", "turbogap_main.f90", rank)
 #endif
@@ -909,6 +920,15 @@ contains
          call collect_calculation(do_%forces, state%n_sites, vdw,&
               & this_vdw, state%energies%vdw)
 
+         if (perform%pdf) &
+         call collect_calculation(do_%forces, state%n_sites, pdf,&
+              & this_pdf, state%energies%pdf)
+
+         ! state%energies%exp is the sum of every experimental-observable
+         ! bias energy (only pdf is wired up so far - sf/xrd/nd/xps join this
+         ! sum once implemented).
+         state%energies%exp = state%energies%pdf
+
          call time_end(time%mpi)
 
          ! calculation_t buffers (and energies_e0/this_energies_e0) may each be
@@ -941,6 +961,11 @@ contains
          if (perform%vdw) then
             total%energies%array(1:state%n_sites) = total%energies%array(1:state%n_sites) &
                                                     + vdw%energies%array(1:state%n_sites)
+         end if
+
+         if (perform%pdf) then
+            total%energies%array(1:state%n_sites) = total%energies%array(1:state%n_sites) &
+                                                    + pdf%energies%array(1:state%n_sites)
          end if
 
          total%energy = sum(total%energies%array(1:state%n_sites))
@@ -977,6 +1002,12 @@ contains
                total%forces%array(1:3, 1:state%n_sites) = total%forces%array(1:3, 1:state%n_sites) &
                                                           + vdw%forces%array(1:3, 1:state%n_sites)
                total%virial = total%virial + vdw%virial
+            end if
+
+            if (perform%pdf) then
+               total%forces%array(1:3, 1:state%n_sites) = total%forces%array(1:3, 1:state%n_sites) &
+                                                          + pdf%forces%array(1:3, 1:state%n_sites)
+               total%virial = total%virial + pdf%virial
             end if
 
             ! if (rank == 0) then
@@ -1123,6 +1154,7 @@ contains
                                           this_total, &
                                           this_gap_soap, this_gap_2b, this_gap_3b, &
                                           this_gap_core_pot, &
+                                          this_pdf, &
                                           this_xrd, this_xps, this_vdw, &
                                           calc_memory%total, calc_memory%max, rank)
 
