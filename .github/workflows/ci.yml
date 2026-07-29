@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran openmpi-bin libopenmpi-dev libopenblas-dev
+          pip install fprettify
+
+      - name: Check formatting (fprettify)
+        run: make format-check
+
+      - name: Build
+        run: make
+
+      - name: Run tests_manual smoke suite
+        run: make test TEST_TIMEOUT=120

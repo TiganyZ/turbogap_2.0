@@ -401,23 +401,23 @@ contains
          end if
 !     Positions
          if (do_%write_array_property(2)) then
-            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") state%positions_wrapped(1:3, i)
+            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") state%positions_wrapped%array(1:3, i)
          end if
 !     State%Velocities
          if (do_%write_array_property(3)) then
-            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") state%velocities(1:3, i)
+            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") state%velocities%array(1:3, i)
          end if
 !     Calc%Forces
          if (do_%write_array_property(4)) then
-            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") calc%forces(1:3, i)
+            write (trajectory, "(1X,F16.8,1X,F16.8,1X,F16.8)", advance="no") calc%forces%array(1:3, i)
          end if
 !     Local energy
          if (do_%write_array_property(5)) then
-            write (trajectory, "(1X,F16.8)", advance="no") calc%energies(i)
+            write (trajectory, "(1X,F16.8)", advance="no") calc%energies%array(i)
          end if
 !     State%Masses
          if (do_%write_array_property(6)) then
-            write (trajectory, "(1X,F16.8)", advance="no") state%masses(i)/103.6426965268d0
+            write (trajectory, "(1X,F16.8)", advance="no") state%masses%array(i)/103.6426965268d0
          end if
 !     Hirshfeld volumes
          !  if( do_%write_array_property(7) )then
@@ -425,14 +425,14 @@ contains
          ! end if
 ! Local properties
          if (allocated(do_%write_local_properties)) then
-            do j = 1, size(state%local_properties, 2)
-               write (trajectory, "(1X,F16.8)", advance="no") state%local_properties(i, j)
+            do j = 1, state%n_local_properties
+               write (trajectory, "(1X,F16.8)", advance="no") state%local_properties%array(i, j)
             end do
          end if
 
 !     Fix atoms
          if (do_%write_array_property(8)) then
-            write (trajectory, "(1X,L1,1X,L1,1X,L1)", advance="no") state%fix_atom(1:3, i)
+            write (trajectory, "(1X,L1,1X,L1,1X,L1)", advance="no") state%fix_atom%array(1:3, i)
          end if
 !     Advance
          write (trajectory, *)

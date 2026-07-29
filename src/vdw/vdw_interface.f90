@@ -72,14 +72,14 @@ contains
                j2 = mod(neighbors%neighbors_list%array(split%j_beg + k) - 1, state%n_sites) + 1
                k = k + 1
                !                 v_neigh_vdw(k) = hirshfeld_v(j2)
-               v_neigh_vdw(k) = state%local_properties(j2, lp_indexes%hirshfeld_v)
+               v_neigh_vdw(k) = state%local_properties%array(j2, lp_indexes%hirshfeld_v)
             end do
          end do
 
          n_sites_local = split%i_end - split%i_beg + 1
          n_pairs_local = split%j_end - split%j_beg + 1
 
-         call get_ts_energy_and_forces(state%local_properties(split%i_beg:split%i_end, lp_indexes%hirshfeld_v), & !hirshfeld_v, &
+         call get_ts_energy_and_forces(state%local_properties%array(split%i_beg:split%i_end, lp_indexes%hirshfeld_v), & !hirshfeld_v, &
                                        local_properties_cart_der(:, split%j_beg:split%j_end, lp_indexes%hirshfeld_v), & ! hirshfeld_v_cart_der, &
                                        n_sites_local, &
                                        n_pairs_local, &
@@ -106,8 +106,8 @@ contains
                                        !                                        this_vdw_calculation%forces, &
                                        !                                        this_vdw_calculation%virial)
                                        ! #else
-                                       vdw_calculation%energies(split%i_beg:split%i_end), &
-                                       vdw_calculation%forces, &
+                                       vdw_calculation%energies%array(split%i_beg:split%i_end), &
+                                       vdw_calculation%forces%array, &
                                        vdw_calculation%virial)
 !#endif
 

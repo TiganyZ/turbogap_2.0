@@ -62,7 +62,7 @@ contains
       real(dp) :: mat_inv(3, 3)
       real(dp) :: md
 
-      md = -mat(1,3)*mat(3,1)*mat(2,2) + mat(2,1)*mat(1,3)*mat(3,2) + mat(1,2)*mat(3,1)*mat(2,3) - mat(1,1)*mat(2,3)*mat(3,2) &
+      md = -mat(1, 3)*mat(3, 1)*mat(2, 2) + mat(2, 1)*mat(1, 3)*mat(3, 2) + mat(1, 2)*mat(3, 1)*mat(2, 3) - mat(1, 1)*mat(2, 3)*mat(3, 2) &
            - mat(1, 2)*mat(2, 1)*mat(3, 3) + mat(1, 1)*mat(2, 2)*mat(3, 3)
       mat_inv(1, 1) = mat(2, 2)*mat(3, 3) - mat(2, 3)*mat(3, 2)
       mat_inv(1, 2) = mat(1, 3)*mat(3, 2) - mat(1, 2)*mat(3, 3)
@@ -684,19 +684,21 @@ contains
       real*8 :: dist(1:3), d
       integer :: Np, i, i_shift(1:3)
 
-      Np = size(state%positions_wrapped, 2)
+      ! state%n_sites (the logical count), not state%positions_wrapped's
+      ! physical capacity, which may be overallocated.
+      Np = state%n_sites
 
       do i = 1, Np
-         call get_distance([0.d0, 0.d0, 0.d0], state%positions(1:3, i), &
+         call get_distance([0.d0, 0.d0, 0.d0], state%positions%array(1:3, i), &
                            state%a_box(1:3)/dfloat(state%indices(1)), &
                            state%b_box(1:3)/dfloat(state%indices(2)), &
                            state%c_box(1:3)/dfloat(state%indices(3)), &
                            [.true., .true., .true.], dist, d, i_shift(1:3))
 
-         state%positions_wrapped(1:3, i) = state%positions(1:3, i) &
-                                           - i_shift(1)*state%a_box(1:3)/dfloat(state%indices(1)) &
-                                           - i_shift(2)*state%b_box(1:3)/dfloat(state%indices(2)) &
-                                           - i_shift(3)*state%c_box(1:3)/dfloat(state%indices(3))
+         state%positions_wrapped%array(1:3, i) = state%positions%array(1:3, i) &
+                                                 - i_shift(1)*state%a_box(1:3)/dfloat(state%indices(1)) &
+                                                 - i_shift(2)*state%b_box(1:3)/dfloat(state%indices(2)) &
+                                                 - i_shift(3)*state%c_box(1:3)/dfloat(state%indices(3))
       end do
    end subroutine wrap_pbc
 
@@ -709,38 +711,40 @@ contains
       Np = state%n_sites
 
       do i = 1, Np
-         call get_distance([0.d0, 0.d0, 0.d0], state%positions(1:3, i), &
+         call get_distance([0.d0, 0.d0, 0.d0], state%positions%array(1:3, i), &
                            state%a_box(1:3)/dfloat(state%indices(1)), &
                            state%b_box(1:3)/dfloat(state%indices(2)), &
                            state%c_box(1:3)/dfloat(state%indices(3)), &
                            [.true., .true., .true.], dist, d, i_shift(1:3))
 
-         state%positions(1:3, i) = state%positions(1:3, i) &
-                                   - i_shift(1)*state%a_box(1:3)/dfloat(state%indices(1)) &
-                                   - i_shift(2)*state%b_box(1:3)/dfloat(state%indices(2)) &
-                                   - i_shift(3)*state%c_box(1:3)/dfloat(state%indices(3))
+         state%positions%array(1:3, i) = state%positions%array(1:3, i) &
+                                         - i_shift(1)*state%a_box(1:3)/dfloat(state%indices(1)) &
+                                         - i_shift(2)*state%b_box(1:3)/dfloat(state%indices(2)) &
+                                         - i_shift(3)*state%c_box(1:3)/dfloat(state%indices(3))
       end do
    end subroutine wrap_pbc_cell
 
    subroutine wrap_pbc_supercell(state)
+      !! Dead code (never called - only commented-out call sites remain).
       type(state_t), intent(inout) :: state
 
       real*8 :: dist(1:3), d
       integer :: Np, i, i_shift(1:3)
 
-      Np = size(state%positions, 2)
+      ! Logical extent, not physical capacity (state%positions may be overallocated).
+      Np = state%positions%used_dims(2)
 
       do i = 1, Np
-         call get_distance([0.d0, 0.d0, 0.d0], state%positions(1:3, i), &
+         call get_distance([0.d0, 0.d0, 0.d0], state%positions%array(1:3, i), &
                            state%a_box(1:3), &
                            state%b_box(1:3), &
                            state%c_box(1:3), &
                            [.true., .true., .true.], dist, d, i_shift(1:3))
 
-         state%positions(1:3, i) = state%positions(1:3, i) &
-                                   - i_shift(1)*state%a_box(1:3) &
-                                   - i_shift(2)*state%b_box(1:3) &
-                                   - i_shift(3)*state%c_box(1:3)
+         state%positions%array(1:3, i) = state%positions%array(1:3, i) &
+                                         - i_shift(1)*state%a_box(1:3) &
+                                         - i_shift(2)*state%b_box(1:3) &
+                                         - i_shift(3)*state%c_box(1:3)
       end do
    end subroutine wrap_pbc_supercell
 

@@ -351,7 +351,7 @@ contains
    end subroutine get_mc_move
 
    subroutine mc_insert_site(mc_species, mc_id, positions, ref_positions, idx, n_sites, a_box, b_box, c_box, &
-                  indices, species, ref_species, xyz_species, ref_xyz_species, min_dist, max_dist, cannot_insert_site, max_trials, &
+                             indices, species, ref_species, xyz_species, ref_xyz_species, min_dist, max_dist, cannot_insert_site, max_trials, &
                              mc_n_planes, mc_planes, mc_max_dist_to_planes, mc_planes_restrict_to_polyhedron)
 
       implicit none

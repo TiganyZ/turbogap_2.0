@@ -28,7 +28,8 @@
 
 module types
    use kinds, only: dp
-   use tg_memory, only: tg_array_1_dp, tg_array_2_dp, tg_array_1_int, tg_array_1_logical
+   use tg_memory, only: tg_array_1_dp, tg_array_2_dp, tg_array_3_dp, tg_array_1_int, &
+                        tg_array_2_logical, tg_array_1_logical
    implicit none
   !! This file contains the general types which are operated on by TurboGAP
   !! State is the main state of the program, which contains the positions,
@@ -170,39 +171,43 @@ module types
       real(dp)    :: instant_temp = 0.0_dp
       real(dp)    :: instant_pressure = 0.0_dp
 
-      ! Dynamical state
-      real(dp), allocatable    :: positions(:, :)
+      ! Dynamical state. Tracked, overallocation-aware buffers: see tg_memory
+      ! (src/allocation/). %array is the underlying data; %used_dims is the
+      ! logical extent, which may be smaller than the physical capacity %dims
+      ! when a buffer has been overallocated to avoid reallocation churn.
+      type(tg_array_2_dp) :: positions
                                  !! Positions array wrapped around the unit cell
-      real(dp), allocatable    :: positions_wrapped(:, :)
+      type(tg_array_2_dp) :: positions_wrapped
 
-      real(dp), allocatable    :: velocities(:, :)
-      real(dp), allocatable    :: positions_supercell(:, :)
-      real(dp), allocatable    :: velocities_supercell(:, :)
+      type(tg_array_2_dp) :: velocities
+      type(tg_array_2_dp) :: positions_supercell
+      type(tg_array_2_dp) :: velocities_supercell
 
       ! Species
-      integer, allocatable     :: species(:)
+      type(tg_array_1_int) :: species
       character*8, allocatable :: xyz_species(:)
 
-      integer, allocatable     :: species_supercell(:)
+      type(tg_array_1_int) :: species_supercell
       character*8, allocatable :: xyz_species_supercell(:)
 
-      real(dp), allocatable     :: masses(:)
+      type(tg_array_1_dp) :: masses
 
       ! Fix atom
-      logical, allocatable     :: fix_atom(:, :)
+      type(tg_array_2_logical) :: fix_atom
 
       ! Local properties
       integer                     :: n_local_properties = 0
       integer                     :: n_local_properties_tot = 0
-      integer, allocatable        :: local_property_indexes(:)
+      type(tg_array_1_int)        :: local_property_indexes
       character*1024, allocatable :: local_property_labels(:)
 
-      real(dp), allocatable :: local_properties(:, :)
-      real(dp), allocatable :: this_local_properties(:, :)
+      type(tg_array_2_dp) :: local_properties
+      type(tg_array_2_dp) :: this_local_properties
 
-      real(dp), allocatable :: local_properties_cart_der(:, :, :)
-      real(dp), allocatable :: this_local_properties_cart_der(:, :, :)
+      type(tg_array_3_dp) :: local_properties_cart_der
+      type(tg_array_3_dp) :: this_local_properties_cart_der
 
+      type(memory_t) :: memory
    end type state_t
 
                           !! Type for splitting atoms/neighbors to mpi processes
@@ -217,8 +222,8 @@ module types
      !! Type for generic calculation. Used for any calculation
      !!   type.such as soap, 2b, 3b, xps etc
 
-      real(dp), allocatable :: energies(:)
-      real(dp), allocatable :: forces(:, :)
+      type(tg_array_1_dp) :: energies
+      type(tg_array_2_dp) :: forces
       real(dp) :: virial(3, 3) = 0.0_dp
       real(dp) :: energy = 0.0_dp
    end type calculation_t
@@ -425,41 +430,26 @@ contains
 
       lhs%energies = rhs%energies
 
-      if (allocated(rhs%positions)) then
-         allocate (lhs%positions, source=rhs%positions)
-      else
-         if (allocated(lhs%positions)) deallocate (lhs%positions)
-      end if
-
-      if (allocated(rhs%positions_wrapped)) then
-         allocate (lhs%positions_wrapped, source=rhs%positions_wrapped)
-      else
-         if (allocated(lhs%positions_wrapped)) deallocate (lhs%positions_wrapped)
-      end if
-
-      if (allocated(rhs%velocities)) then
-         allocate (lhs%velocities, source=rhs%velocities)
-      else
-         if (allocated(lhs%velocities)) deallocate (lhs%velocities)
-      end if
-
-      if (allocated(rhs%positions_supercell)) then
-         allocate (lhs%positions_supercell, source=rhs%positions_supercell)
-      else
-         if (allocated(lhs%positions_supercell)) deallocate (lhs%positions_supercell)
-      end if
-
-      if (allocated(rhs%velocities_supercell)) then
-         allocate (lhs%velocities_supercell, source=rhs%velocities_supercell)
-      else
-         if (allocated(lhs%velocities_supercell)) deallocate (lhs%velocities_supercell)
-      end if
-
-      if (allocated(rhs%species)) then
-         allocate (lhs%species, source=rhs%species)
-      else
-         if (allocated(lhs%species)) deallocate (lhs%species)
-      end if
+      ! positions/velocities/species/masses/fix_atom/local_properties* are now
+      ! tg_array_<rank>_<prec> (non-allocatable scalar components with an
+      ! allocatable %array inside) - plain structure assignment already deep
+      ! copies them correctly (including the %array component), so this no
+      ! longer needs the manual allocated()/allocate(source=)/deallocate dance.
+      lhs%positions = rhs%positions
+      lhs%positions_wrapped = rhs%positions_wrapped
+      lhs%velocities = rhs%velocities
+      lhs%positions_supercell = rhs%positions_supercell
+      lhs%velocities_supercell = rhs%velocities_supercell
+      lhs%species = rhs%species
+      lhs%species_supercell = rhs%species_supercell
+      lhs%masses = rhs%masses
+      lhs%fix_atom = rhs%fix_atom
+      lhs%local_properties = rhs%local_properties
+      lhs%this_local_properties = rhs%this_local_properties
+      lhs%local_properties_cart_der = rhs%local_properties_cart_der
+      lhs%this_local_properties_cart_der = rhs%this_local_properties_cart_der
+      lhs%local_property_indexes = rhs%local_property_indexes
+      lhs%memory = rhs%memory
 
       if (allocated(rhs%xyz_species)) then
          allocate (lhs%xyz_species, source=rhs%xyz_species)
@@ -467,58 +457,10 @@ contains
          if (allocated(lhs%xyz_species)) deallocate (lhs%xyz_species)
       end if
 
-      if (allocated(rhs%species_supercell)) then
-         allocate (lhs%species_supercell, source=rhs%species_supercell)
-      else
-         if (allocated(lhs%species_supercell)) deallocate (lhs%species_supercell)
-      end if
-
       if (allocated(rhs%xyz_species_supercell)) then
          allocate (lhs%xyz_species_supercell, source=rhs%xyz_species_supercell)
       else
          if (allocated(lhs%xyz_species_supercell)) deallocate (lhs%xyz_species_supercell)
-      end if
-
-      if (allocated(rhs%masses)) then
-         allocate (lhs%masses, source=rhs%masses)
-      else
-         if (allocated(lhs%masses)) deallocate (lhs%masses)
-      end if
-
-      if (allocated(rhs%fix_atom)) then
-         allocate (lhs%fix_atom, source=rhs%fix_atom)
-      else
-         if (allocated(lhs%fix_atom)) deallocate (lhs%fix_atom)
-      end if
-
-      if (allocated(rhs%local_properties)) then
-         allocate (lhs%local_properties, source=rhs%local_properties)
-      else
-         if (allocated(lhs%local_properties)) deallocate (lhs%local_properties)
-      end if
-
-      if (allocated(rhs%this_local_properties)) then
-         allocate (lhs%this_local_properties, source=rhs%this_local_properties)
-      else
-         if (allocated(lhs%this_local_properties)) deallocate (lhs%this_local_properties)
-      end if
-
-      if (allocated(rhs%local_properties_cart_der)) then
-         allocate (lhs%local_properties_cart_der, source=rhs%local_properties_cart_der)
-      else
-         if (allocated(lhs%local_properties_cart_der)) deallocate (lhs%local_properties_cart_der)
-      end if
-
-      if (allocated(rhs%this_local_properties_cart_der)) then
-         allocate (lhs%this_local_properties_cart_der, source=rhs%this_local_properties_cart_der)
-      else
-         if (allocated(lhs%this_local_properties_cart_der)) deallocate (lhs%this_local_properties_cart_der)
-      end if
-
-      if (allocated(rhs%local_property_indexes)) then
-         allocate (lhs%local_property_indexes, source=rhs%local_property_indexes)
-      else
-         if (allocated(lhs%local_property_indexes)) deallocate (lhs%local_property_indexes)
       end if
 
       if (allocated(rhs%local_property_labels)) then

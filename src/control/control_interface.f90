@@ -46,97 +46,83 @@ contains
 
    !----------------------------------------
 
-  ! subroutine determine_simulation( do_, mode )
-  !   character*8, intent(in) :: mode
-  !   type( control_t ), intent(inout) :: do_$
+   subroutine check_repeat_xyz_and_md(repeat_xyz, do_md)
+      logical, intent(in) :: repeat_xyz
+      logical, intent(in) :: do_md
 
-  !   if ( mode == "mc" )then
-  !      if ( do_% )
+      if (repeat_xyz .and. do_md) then
+         call print_error("You cannot do molecular dynamics and have multiple xyz files! "// &
+                          "Please either use multiple xyz and run turbogap predict, or use one xyz and run turbogap md")
+         stop
+      end if
+   end subroutine check_repeat_xyz_and_md
 
+   pure function decide_read_xyz(do_, md_i_step, mc_i_step) result(decision)
+      type(control_t), intent(in) :: do_
+      integer, intent(in) :: md_i_step
+      integer, intent(in) :: mc_i_step
+      logical :: decision
 
+      decision = (do_%prediction .and. &
+                  ( &
+                  (do_%md .and. md_i_step == 0 .and. (.not. do_%mc)) .or. &
+                  (do_%mc .and. mc_i_step == 0) .or. &
+                  (do_%repeat_xyz) &
+                  ) &
+                  )
+   end function decide_read_xyz
 
-  subroutine check_repeat_xyz_and_md( repeat_xyz, do_md )
-    logical, intent(in) :: repeat_xyz
-    logical, intent(in) :: do_md
+   pure function decide_md(do_) result(decision)
+      type(control_t), intent(in) :: do_
+      logical :: decision
+      decision = (do_%md)
+   end function decide_md
 
-    if ( repeat_xyz .and. do_md )then
-       call print_error( "You cannot do molecular dynamics and have multiple&
-            & xyz files! Please either use multiple xyz and run `turbogap predict`, or&
-            & use one xyz and run `turbogap md`" )
-       stop
-    end if
-  end subroutine check_repeat_xyz_and_md
+   pure function decide_mc(do_) result(decision)
+      type(control_t), intent(in) :: do_
+      logical :: decision
+      decision = (do_%mc .and. (.not. do_%md))
+   end function decide_mc
 
+   pure function decide_randomize_velocities(md_randomize_velocities,&
+        & do_md, md_i_step, allocated_velocities) result(decision)
+      logical, intent(in) :: md_randomize_velocities
+      logical, intent(in) :: do_md
+      integer, intent(in) :: md_i_step
+      logical, intent(in) :: allocated_velocities
+      logical :: decision
 
-  pure function decide_read_xyz( do_, md_i_step, mc_i_step ) result( decision )
-    type( control_t ), intent(in) :: do_
-    integer, intent(in) :: md_i_step
-    integer, intent(in) :: mc_i_step
-    logical :: decision
+      decision = ((do_md .and. (md_i_step == 0) .and. md_randomize_velocities) &
+                  .or. (do_md .and. (md_i_step == 0) .and. (.not. allocated_velocities)))
 
-    decision = ( do_%prediction .and. &
-           ( &
-             ( do_%md .and. md_i_step == 0 .and. (.not. do_%mc) ) .or.  &
-             ( do_%mc .and. mc_i_step == 0 ) .or.  &
-             ( do_%repeat_xyz )  &
-              ) &
-      )
-  end function decide_read_xyz
+   end function decide_randomize_velocities
 
-  pure function decide_md( do_) result(decision)
-    type( control_t ), intent(in) :: do_
-    logical :: decision
-    decision = ( do_%md )
-  end function decide_md
+   pure function decide_write_xyz(do_, md, mc, rank) result(decision)
+      type(control_t), intent(in) :: do_
+      type(md_t), intent(in) :: md
+      type(mc_t), intent(in) :: mc
+      integer, intent(in) :: rank
+      logical :: decision
+      decision = ( &
+                 (do_%prediction .and. (.not. do_%md) .and. (.not. do_%mc)) .or. &
+                 (do_%md .and. (.not. do_%mc) .and. &
+                  (modulo(md%i_step, do_%write_xyz) == 0)) .or. &
+                 (do_%mc .and. (.not. do_%md) .and. &
+                  (modulo(mc%i_step, do_%write_xyz) == 0)) &
+                 )
+      decision = (rank == 0) .and. decision
 
-  pure function decide_mc( do_) result(decision)
-    type( control_t ), intent(in) :: do_
-    logical :: decision
-    decision = ( do_%mc .and. ( .not. do_%md ) )
-  end function decide_mc
+   end function decide_write_xyz
 
-  pure function decide_randomize_velocities( md_randomize_velocities,&
-       & do_md, md_i_step, allocated_velocities) result(decision)
-    logical, intent(in) :: md_randomize_velocities
-    logical, intent(in) :: do_md
-    integer, intent(in) :: md_i_step
-    logical, intent(in) :: allocated_velocities
-    logical :: decision
-
-    decision = ( ( do_md .and. (md_i_step == 0) .and. md_randomize_velocities  ) &
-         .or. ( do_md .and. (md_i_step == 0) .and. (.not. allocated_velocities ) ) )
-
-  end function decide_randomize_velocities
-
-
-  pure function decide_write_xyz( do_, md, mc, rank) result(decision)
-    type( control_t ), intent(in) :: do_
-    type( md_t ), intent(in) :: md
-    type( mc_t ), intent(in) :: mc
-    integer, intent(in) :: rank
-    logical :: decision
-    decision = ( &
-                          (do_%prediction .and. (.not. do_%md ) .and. (.not. do_%mc)) .or. &
-                          (do_%md .and. (.not. do_%mc) .and. &
-                           (modulo(md%i_step, do_%write_xyz) == 0)) .or. &
-                          (do_%mc .and. (.not. do_%md) .and. &
-                           (modulo(mc%i_step, do_%write_xyz) == 0)) &
-                          )
-    decision = (rank == 0) .and. decision
-
-  end function decide_write_xyz
-
-  pure function decide_write_thermo( do_, md, rank) result(decision)
-    type( control_t ), intent(in) :: do_
-    type( md_t ), intent(in) :: md
-    integer, intent(in) :: rank
-    logical :: decision
-    decision = (do_%md .and. &
-         (modulo(md%i_step, do_%write_thermo) == 0))
-    decision = (rank == 0) .and. decision
-  end function decide_write_thermo
-
-
+   pure function decide_write_thermo(do_, md, rank) result(decision)
+      type(control_t), intent(in) :: do_
+      type(md_t), intent(in) :: md
+      integer, intent(in) :: rank
+      logical :: decision
+      decision = (do_%md .and. &
+                  (modulo(md%i_step, do_%write_thermo) == 0))
+      decision = (rank == 0) .and. decision
+   end function decide_write_thermo
 
    pure function check_exit(do_, md, mc) result(leave_loop)
       type(control_t), intent(in)   :: do_

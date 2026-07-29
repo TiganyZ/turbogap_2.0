@@ -42,6 +42,7 @@ module md_interface
 
    use timing, only: time_start, time_end
    use bussi, only: resamplekin
+   use tg_memory, only: tg_alloc
    use mpi
    !use constants
 
@@ -77,21 +78,22 @@ contains
          call print_parameter("t_beg", thermo%t_beg)
       end if
 
-      call random_number(state%velocities)
+      call random_number(state%velocities%array(1:3, 1:state%n_sites))
 
-      call remove_cm_vel(state%velocities(1:3, 1:state%n_sites), &
-                         state%masses(1:state%n_sites))
+      call remove_cm_vel(state%velocities%array(1:3, 1:state%n_sites), &
+                         state%masses%array(1:state%n_sites))
 
       state%E_kinetic = 0.0_dp
       do i = 1, state%n_sites
          state%E_kinetic = state%E_kinetic + &
-                           0.5_dp*state%masses(i)* &
-                           dot_product(state%velocities(1:3, i), &
-                                       state%velocities(1:3, i))
+                           0.5_dp*state%masses%array(i)* &
+                           dot_product(state%velocities%array(1:3, i), &
+                                       state%velocities%array(1:3, i))
 
       end do
       state%instant_temp = 2.0_dp/3.0_dp/dfloat(state%n_sites - 1)/kB*state%E_kinetic
-      state%velocities = state%velocities*dsqrt(thermo%t_beg/state%instant_temp)
+      state%velocities%array(1:3, 1:state%n_sites) = state%velocities%array(1:3, 1:state%n_sites) &
+                                                     *dsqrt(thermo%t_beg/state%instant_temp)
    end subroutine reset_velocities
 
    pure function get_kinetic_energy(masses, velocities, n_sites) result(E_kinetic)
@@ -682,13 +684,17 @@ contains
          converged = .false.
       end if
 
+      ! NOTE: md%positions_diff/positions_prev/forces_prev are plain (non-tg_array)
+      ! md_t fields, always allocated to exactly n_sites (not overallocated), so
+      ! they're sized from state%n_sites directly here rather than from
+      ! state%positions's (possibly overallocated) physical size.
       if (perform%reallocate) then
          if (allocated(md%positions_diff)) deallocate (md%positions_diff)
          if (allocated(md%positions_prev)) deallocate (md%positions_prev)
          if (allocated(md%forces_prev)) deallocate (md%forces_prev)
 
-         allocate (md%positions_diff(1:3, 1:size(state%positions, 2)), source=0.0_dp)
-         allocate (md%positions_prev(1:3, 1:size(state%positions, 2)), source=0.0_dp)
+         allocate (md%positions_diff(1:3, 1:state%n_sites), source=0.0_dp)
+         allocate (md%positions_prev(1:3, 1:state%n_sites), source=0.0_dp)
          allocate (md%forces_prev(1:3, 1:state%n_sites), source=0.0_dp)
       end if
 
@@ -698,23 +704,28 @@ contains
             if (allocated(md%positions_prev)) deallocate (md%positions_prev)
             if (allocated(md%forces_prev)) deallocate (md%forces_prev)
 
-            allocate (md%positions_diff(1:3, 1:size(state%positions, 2)), source=0.0_dp)
-            allocate (md%positions_prev(1:3, 1:size(state%positions, 2)), source=0.0_dp)
+            allocate (md%positions_diff(1:3, 1:state%n_sites), source=0.0_dp)
+            allocate (md%positions_prev(1:3, 1:state%n_sites), source=0.0_dp)
             allocate (md%forces_prev(1:3, 1:state%n_sites), source=0.0_dp)
          end if
       end if
 
-      if (allocated(state%velocities)) then
-         if (size(state%velocities, 2) /= state%n_sites) then
-            deallocate (state%velocities)
-            allocate (state%velocities(3, state%n_sites), source=0.0_dp)
+      ! state%velocities%used_dims (the logical extent), not its physical
+      ! capacity, is what must match state%n_sites here.
+      if (state%velocities%allocated) then
+         if (state%velocities%used_dims(2) /= state%n_sites) then
+            call tg_alloc(state%velocities, [3, state%n_sites], &
+                          state%memory%total, state%memory%max, rank, "state%velocities")
+            state%velocities%array(1:3, 1:state%n_sites) = 0.0_dp
 
             call reset_velocities(state, thermo, 0)
          end if
       end if
 
-      if (.not. allocated(state%velocities)) then
-         allocate (state%velocities(3, state%n_sites), source=0.0_dp)
+      if (.not. state%velocities%allocated) then
+         call tg_alloc(state%velocities, [3, state%n_sites], &
+                       state%memory%total, state%memory%max, rank, "state%velocities")
+         state%velocities%array(1:3, 1:state%n_sites) = 0.0_dp
 
          call reset_velocities(state, thermo, 0)
       end if
@@ -724,7 +735,7 @@ contains
                                  !! Wrapping positions around the supercell here
       !call wrap_pbc_supercell(state)
       ! call wrap_pbc_supercell(state)
-      call remove_cm_vel(state%velocities, state%masses)
+      call remove_cm_vel(state%velocities%array(1:3, 1:state%n_sites), state%masses%array(1:state%n_sites))
 
       ! FIXME: Implement adaptive timestep stuff!
       ! call calculate_adaptive_timestep_eph()
@@ -749,16 +760,16 @@ contains
          !call velocity_verlet_state(state, md, forces)
 
          call velocity_verlet( &
-            state%positions(1:3, 1:state%n_sites), &
+            state%positions%array(1:3, 1:state%n_sites), &
             md%positions_prev(1:3, 1:state%n_sites), &
-            state%velocities, &
-            total%forces, &
+            state%velocities%array(1:3, 1:state%n_sites), &
+            total%forces%array(1:3, 1:state%n_sites), &
             md%forces_prev, &
-            state%masses, &
+            state%masses%array(1:state%n_sites), &
             md%time_step, &
             md%time_step_prev, &
             md%i_step == 0, &
-            state%fix_atom) !, md%optimize_for_atoms)
+            state%fix_atom%array(1:3, 1:state%n_sites)) !, md%optimize_for_atoms)
 
          ! state%a_box/dfloat(state%indices(1)), &
          ! state%b_box/dfloat(state%indices(2)), &
@@ -766,18 +777,18 @@ contains
       else if (md%optimize == "gd") then
 
          call gradient_descent( &
-            state%positions(1:3, 1:state%n_sites), &
+            state%positions%array(1:3, 1:state%n_sites), &
             md%positions_prev(1:3, 1:state%n_sites), &
-            state%velocities, &
-            total%forces, &
+            state%velocities%array(1:3, 1:state%n_sites), &
+            total%forces%array(1:3, 1:state%n_sites), &
             md%forces_prev, &
-            state%masses, &
+            state%masses%array(1:state%n_sites), &
             md%max_opt_step, &
             md%i_step == 0, &
             state%a_box/dfloat(state%indices(1)), &
             state%b_box/dfloat(state%indices(2)), &
             state%c_box/dfloat(state%indices(3)), &
-            state%fix_atom, &
+            state%fix_atom%array(1:3, 1:state%n_sites), &
             state%energy)
 
       else if (md%optimize == "gd-variable-cell") then
@@ -809,12 +820,12 @@ contains
          call gradient_descent_positions_and_lattice(state%energy, &
                                                      state%n_sites, &
                                                      md%gd_variable_cell_w, &
-                                                     state%positions, &
-                                                     total%forces, &
+                                                     state%positions%array(1:3, 1:state%n_sites), &
+                                                     total%forces%array(1:3, 1:state%n_sites), &
                                                      total%virial/state%volume, &
-                                                     state%masses, &
-                                                     state%velocities, &
-                                                     state%fix_atom, &
+                                                     state%masses%array(1:state%n_sites), &
+                                                     state%velocities%array(1:3, 1:state%n_sites), &
+                                                     state%fix_atom%array(1:3, 1:state%n_sites), &
                                                      state%a_box, &
                                                      state%b_box, &
                                                      state%c_box, &
@@ -831,23 +842,23 @@ contains
 
          !       We propagate the state%positions
          call gradient_descent( &
-            state%positions(1:3, 1:state%n_sites), &
+            state%positions%array(1:3, 1:state%n_sites), &
             md%positions_prev(1:3, 1:state%n_sites), &
-            state%velocities, &
-            total%forces, &
+            state%velocities%array(1:3, 1:state%n_sites), &
+            total%forces%array(1:3, 1:state%n_sites), &
             md%forces_prev, &
-            state%masses, &
+            state%masses%array(1:state%n_sites), &
             md%max_opt_step, &
             md%gd_i_step == 0, &
             state%a_box/dfloat(state%indices(1)), &
             state%b_box/dfloat(state%indices(2)), &
             state%c_box/dfloat(state%indices(3)), &
-            state%fix_atom, &
+            state%fix_atom%array(1:3, 1:state%n_sites), &
             state%energy)
 
          if (md%gd_i_step > 1 &
              .and. abs(state%energy - md%energy_prev) < md%e_tol*dfloat(state%n_sites) &
-             .and. maxval(total%forces) < &
+             .and. maxval(total%forces%array(1:3, 1:state%n_sites)) < &
              md%f_tol) then
             !         If the position optimization is converged
             !         (energy only) we set the code to do the
@@ -861,8 +872,8 @@ contains
 
          ! If nothing happens we still update these variables
 
-         md%positions_prev = state%positions
-         md%forces_prev = total%forces
+         md%positions_prev(1:3, 1:state%n_sites) = state%positions%array(1:3, 1:state%n_sites)
+         md%forces_prev(1:3, 1:state%n_sites) = total%forces%array(1:3, 1:state%n_sites)
 
       end if
 
@@ -872,8 +883,9 @@ contains
       !***************************************************************************
                                                                    !! MD writing
 
-      state%E_kinetic = get_kinetic_energy(state%masses, state%velocities,&
-           & state%n_sites)
+      state%E_kinetic = get_kinetic_energy(state%masses%array(1:state%n_sites), &
+                                           state%velocities%array(1:3, 1:state%n_sites), &
+                                           state%n_sites)
 
       state%instant_temp = get_instant_temp(state%n_sites, state%E_kinetic)
 
@@ -911,7 +923,8 @@ contains
     !! Relaxation Convergence Check
 
       converged_relaxation = check_converged_relaxation(do_, md, state%n_sites, &
-                                                        state%energy, md%energy_prev, total%forces, rank)
+                                                        state%energy, md%energy_prev, &
+                                                        total%forces%array(1:3, 1:state%n_sites), rank)
 
       ! FIXME:
       !     THIS CONDITION ON INSTANT PRESSURE WILL NEED TO BE FINE TUNED, TO ACCOUNT FOR ARBITRARY TARGET PRESSURES
@@ -919,7 +932,7 @@ contains
       !     TOTAL PRESSURE BELOW A CERTAIN MINIMUM (DUE TO THE BOX SHAPE CONSTRAINTS)
       converged_box_relaxation = check_converged_box_relaxation(do_, md, state&
            &%n_sites, state%energy, md%energy_prev, state%instant_pressure,&
-           & md%instant_pressure_prev, total%forces, rank)
+           & md%instant_pressure_prev, total%forces%array(1:3, 1:state%n_sites), rank)
 
       converged = converged_relaxation .or. converged_box_relaxation
 
@@ -971,7 +984,7 @@ contains
 
       if (do_%scale_box) then
        !! Just scale the box
-         call box_scaling(state%positions(1:3, 1:state%n_sites), &
+         call box_scaling(state%positions%array(1:3, 1:state%n_sites), &
                           state%a_box, state%b_box, state%c_box, &
                           state%indices, md%i_step, md%n_steps, md%box_scaling_factor)
 
@@ -990,7 +1003,7 @@ contains
          state%a_box(1:3) = lv(1:3, 1)
          state%b_box(1:3) = lv(1:3, 2)
          state%c_box(1:3) = lv(1:3, 3)
-         call berendsen_barostat(state%positions(1:3, 1:state%n_sites), &
+         call berendsen_barostat(state%positions%array(1:3, 1:state%n_sites), &
                                  get_target_state_variable(md%i_step, md%n_steps, thermo%p_beg, thermo%p_end), &
                                  instant_pressure_tensor, md%barostat_sym, md%tau_p, md%gamma_p, md%time_step)
 
@@ -1008,20 +1021,20 @@ contains
 
             !         We rewind state%positions and total%forces because they were already updated above
 
-            state%positions = md%positions_prev
-            total%forces(1:3, 1:state%n_sites) = md%forces_prev(1:3, 1:state%n_sites)
+            state%positions%array(1:3, 1:state%n_sites) = md%positions_prev(1:3, 1:state%n_sites)
+            total%forces%array(1:3, 1:state%n_sites) = md%forces_prev(1:3, 1:state%n_sites)
             !
             state%a_box = state%a_box/dfloat(state%indices(1))
             state%b_box = state%b_box/dfloat(state%indices(2))
             state%c_box = state%c_box/dfloat(state%indices(3))
 
             call gradient_descent_box( &
-               state%positions(1:3, 1:state%n_sites), &
+               state%positions%array(1:3, 1:state%n_sites), &
                md%positions_prev(1:3, 1:state%n_sites), &
-               state%velocities, &
-               total%forces, &
+               state%velocities%array(1:3, 1:state%n_sites), &
+               total%forces%array(1:3, 1:state%n_sites), &
                md%forces_prev, &
-               state%masses, &
+               state%masses%array(1:state%n_sites), &
                md%max_opt_step_eps, &
                md%gd_i_step == 0, &
                state%a_box, state%b_box, state%c_box, &
@@ -1052,7 +1065,7 @@ contains
       if (md%thermostat == "berendsen") then
 
          target_temp = get_target_state_variable(md%i_step, md%n_steps, thermo%t_beg, thermo%t_end)
-         call berendsen_thermostat(state%velocities, &
+         call berendsen_thermostat(state%velocities%array(1:3, 1:state%n_sites), &
                                    target_temp, &
                                    state%instant_temp, md%tau_t, md%time_step)
 
@@ -1060,15 +1073,15 @@ contains
 
          target_temp = get_target_state_variable(md%i_step, md%n_steps, thermo%t_beg, thermo%t_end)
 
-         state%velocities(1:3, 1:state%n_sites) = state%velocities &
-                                                  *dsqrt( &
-                                                  resamplekin(state%E_kinetic, &
-                                                              target_temp, &
-                                                              3*state%n_sites - 3, &
-                                                              md%tau_t, &
-                                                              md%time_step) &
-                                                  /state%E_kinetic &
-                                                  )
+         state%velocities%array(1:3, 1:state%n_sites) = state%velocities%array(1:3, 1:state%n_sites) &
+                                                        *dsqrt( &
+                                                        resamplekin(state%E_kinetic, &
+                                                                    target_temp, &
+                                                                    3*state%n_sites - 3, &
+                                                                    md%tau_t, &
+                                                                    md%time_step) &
+                                                        /state%E_kinetic &
+                                                        )
       end if
 
                                                         !! End of Thermostatting
@@ -1097,7 +1110,7 @@ contains
 
       !     Check what's the maximum atomic displacement since last neighbors build
       md%positions_diff = md%positions_diff &
-                          + (state%positions(1:3, 1:state%n_sites) &
+                          + (state%positions%array(1:3, 1:state%n_sites) &
                              - md%positions_prev(1:3, 1:state%n_sites))
 
       do_%rebuild_neighbors_list = .false.
@@ -1110,9 +1123,9 @@ contains
 
       do i = 1, state%n_sites
 
-         temp_max_diff = dsqrt((state%positions(1, i) - md%positions_prev(1, i))**2 &
-                               + (state%positions(2, i) - md%positions_prev(2, i))**2 &
-                               + (state%positions(3, i) - md%positions_prev(3, i))**2)
+         temp_max_diff = dsqrt((state%positions%array(1, i) - md%positions_prev(1, i))**2 &
+                               + (state%positions%array(2, i) - md%positions_prev(2, i))**2 &
+                               + (state%positions%array(3, i) - md%positions_prev(3, i))**2)
 
          ! temp_max_diff = dsqrt(md%positions_diff(1, i)**2 &
          !                       + md%positions_diff(2, i)**2 &
@@ -1138,14 +1151,14 @@ contains
       end do
 
       ! Resetting even if not supercell, could be optimized away by putting into a routine
-      call set_supercell_positions(state%n_sites, state%positions, &
+      call set_supercell_positions(state%n_sites, state%positions%array, &
                                    state%a_box, state%b_box, state%c_box, state%indices)
 
       ! Set the prev values
       md%energy_prev = state%energy
       md%instant_pressure_prev = state%instant_pressure
 
-      md%positions_prev(1:3, 1:state%n_sites) = state%positions(1:3, 1:state%n_sites)
+      md%positions_prev(1:3, 1:state%n_sites) = state%positions%array(1:3, 1:state%n_sites)
 
       ! Exit conditions
 

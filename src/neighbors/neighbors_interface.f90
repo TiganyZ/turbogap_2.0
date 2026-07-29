@@ -170,24 +170,28 @@ contains
          call time_start(time_neigh)
       end if
 
-      block
-         logical :: do_list_was_allocated
-         do_list_was_allocated = neighbors%do_list%allocated
-         ! tg_alloc is safe to call every step (unlike allocate, which would
-         ! error on an already-allocated array): it only regrows do_list when
-         ! state%n_sites exceeds the current physical capacity, and reuses the
-         ! existing buffer otherwise.
-         call tg_alloc(neighbors%do_list, [state%n_sites], &
-                       neighbors%memory%total, neighbors%memory%max, rank, "neighbors%do_list")
-         if (.not. do_list_was_allocated) neighbors%do_list%array = .false.
-      end block
+      ! tg_alloc is safe to call every step (unlike allocate, which would error
+      ! on an already-allocated array): it only regrows do_list when
+      ! state%n_sites exceeds the current physical capacity, and reuses the
+      ! existing buffer otherwise. Unlike the old "only zero on first-ever
+      ! allocation" approach, do_list is fully reset every call: under MPI the
+      ! site split (split%i_beg:split%i_end) can shift between rebuilds
+      ! whenever n_sites changes (e.g. an MC insertion/removal move), and a
+      ! stale .true. left outside the new range would make a rank build
+      ! neighbor data for sites it no longer owns while the new owner builds
+      ! them too, desynchronizing each rank's local rjs/xyz/... from the
+      ! (globally consistent) n_neigh used to index into them.
+      call tg_alloc(neighbors%do_list, [state%n_sites], &
+                    neighbors%memory%total, neighbors%memory%max, rank, "neighbors%do_list")
+      neighbors%do_list%array(1:state%n_sites) = .false.
 #ifdef _MPIF90
       neighbors%do_list%array(split%i_beg:split%i_end) = .true.
 #else
-      neighbors%do_list%array = .true.
+      neighbors%do_list%array(1:state%n_sites) = .true.
 #endif
 
-      state%n_sites_supercell = size(state%positions, 2)
+      ! Logical extent, not physical capacity (state%positions may be overallocated).
+      state%n_sites_supercell = state%positions%used_dims(2)
 
 #ifdef _DEBUG
       print *, "1 state%a_box(1)", state%a_box(1)
@@ -279,7 +283,7 @@ contains
          neighbors%n_neigh_max = 100
          call tg_alloc(neighbors%neighbors_list, [neighbors%n_neigh_max*state%n_sites], &
                        neighbors%memory%total, neighbors%memory%max, rank, "neighbors%neighbors_list")
-         neighbors%neighbors_list%array = 0
+         neighbors%neighbors_list%array(1:neighbors%neighbors_list%used_dims(1)) = 0
          call tg_alloc(neighbors%n_neigh, [state%n_sites], &
                        neighbors%memory%total, neighbors%memory%max, rank, "neighbors%n_neigh")
          neighbors%n_neigh%array = 0
@@ -305,7 +309,7 @@ contains
          allocate (this_list(1:state%n_sites))
          do i = 1, state%n_sites
             call get_distance([state%a_box(1)/2.d0, state%b_box(2)/2.d0,&
-                 & state%c_box(3)/2.d0], state%positions(1:3, i), state%&
+                 & state%c_box(3)/2.d0], state%positions%array(1:3, i), state%&
                  & a_box(1:3), state%b_box(1:3), state%c_box(1:3), (/.true.,&
                  & .true., .true./), dist, d, i_shift)
             !       This is the position within the supercell, we must make sure
@@ -336,7 +340,7 @@ contains
                neighbors%neighbors_list%array(neighbors%n_atom_pairs) = i
                !         Cell coordinates for this atom
                call get_distance([state%a_box(1)/2.d0, state%b_box(2)/2.d0,&
-                    & state%c_box(3)/2.d0], state%positions(1:3, i), state%&
+                    & state%c_box(3)/2.d0], state%positions%array(1:3, i), state%&
                     & a_box(1:3), state%b_box(1:3), state%c_box(1:3), &
                     &(/.true., .true., .true./), dist, d, i_shift)
                dist = dist + [state%a_box(1)/2.d0, state%b_box(2)/2.d0, state&
@@ -361,8 +365,8 @@ contains
                         k = head(j)
                         do while (k /= 0)
                            if (k /= i) then
-                              call get_distance(state%positions(1:3, i), state &
-                                   &%positions(1:3, k), state%a_box(1:3),&
+                              call get_distance(state%positions%array(1:3, i), state &
+                                   &%positions%array(1:3, k), state%a_box(1:3),&
                                    & state%b_box(1:3), state%c_box(1:3), &
                                    &(/.true., .true., .true./), dist, d, i_shift)
                               if (d < neighbors%rcut_max) then
@@ -396,8 +400,8 @@ contains
 
                do j = 1, state%n_sites_supercell
                   if (j /= i) then
-                     call get_distance(state%positions(1:3, i), state%&
-                          & positions(1:3, j), state%a_box(1:3), state%&
+                     call get_distance(state%positions%array(1:3, i), state%&
+                          & positions%array(1:3, j), state%a_box(1:3), state%&
                           & b_box(1:3), state%c_box(1:3), (/.true., .true.,&
                           & .true./), dist, d, i_shift)
                      if (d < neighbors%rcut_max) then
@@ -471,13 +475,13 @@ contains
                   neighbors%xyz%array(1:3, k2) = (/0.d0, 0.d0, 0.d0/)
                   neighbors%thetas%array(k2) = 0.d0
                   neighbors%phis%array(k2) = 0.d0
-                  neighbors%neighbor_species%array(k2) = state%species_supercell(i)
+                  neighbors%neighbor_species%array(k2) = state%species_supercell%array(i)
                   !            do i2 = 1, species_multiplicity(i)
                   !              mask_species(k2, state % species_supercell(i2, j)) = .true.
                   !            end do
                else
-                  call get_distance(state%positions(1:3, i), state&
-                       &%positions(1:3, j), state%a_box(1:3), state%b_box(1:3),&
+                  call get_distance(state%positions%array(1:3, i), state&
+                       &%positions%array(1:3, j), state%a_box(1:3), state%b_box(1:3),&
                        & state%c_box(1:3), (/.true., .true., .true./), dist, d,&
                        & i_shift)
                   neighbors%rjs%array(k2) = d
@@ -493,7 +497,7 @@ contains
                      neighbors%thetas%array(k2) = dacos(dist(3)/d)
                   end if
                   neighbors%phis%array(k2) = datan2(dist(2), dist(1))
-                  neighbors%neighbor_species%array(k2) = state%species_supercell(j)
+                  neighbors%neighbor_species%array(k2) = state%species_supercell%array(j)
                   !            do i2 = 1, species_multiplicity(i)
                   !              mask_species(k2, state % species_supercell(i2,
                   !              j)) = .true.
@@ -838,7 +842,7 @@ contains
             mat(1:3, 2) = b(1:3)
             mat(1:3, 3) = c(1:3)
 !       We compute the inverse of this matrix analytically
-           md = -mat(1,3)*mat(3,1)*mat(2,2) + mat(2,1)*mat(1,3)*mat(3,2) + mat(1,2)*mat(3,1)*mat(2,3) - mat(1,1)*mat(2,3)*mat(3,2) &
+            md = -mat(1, 3)*mat(3, 1)*mat(2, 2) + mat(2, 1)*mat(1, 3)*mat(3, 2) + mat(1, 2)*mat(3, 1)*mat(2, 3) - mat(1, 1)*mat(2, 3)*mat(3, 2) &
                  - mat(1, 2)*mat(2, 1)*mat(3, 3) + mat(1, 1)*mat(2, 2)*mat(3, 3)
             mat_inv(1, 1) = mat(2, 2)*mat(3, 3) - mat(2, 3)*mat(3, 2)
             mat_inv(1, 2) = mat(1, 3)*mat(3, 2) - mat(1, 2)*mat(3, 3)

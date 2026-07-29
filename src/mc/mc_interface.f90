@@ -41,6 +41,7 @@ module mc_interface
    use state_interface, only: reallocate_state, reallocate_state_out, print_state, reset_state
    use mc_utils
    use write_xyz, only: write_extxyz, get_energy_string
+   use tg_memory, only: tg_alloc, tg_sync
 
    implicit none
 
@@ -180,7 +181,8 @@ contains
    end subroutine initialize_mc
 
    subroutine calculate_mc_step(state, changed, local_property_labels, species_info, thermo, mc, md, perform,&
-        & do_, converged_md, total, file_mc, file_mc_log, format_mc_log, time, time_writing)
+        & do_, converged_md, total, file_mc, file_mc_log, format_mc_log, time, time_writing, &
+        & calc_memory_total, calc_memory_max, rank)
       type(state_t), intent(inout) :: state
       type(change_in_state_t), intent(out) :: changed
       type(mc_t), intent(inout) :: mc
@@ -195,6 +197,9 @@ contains
       type(thermo_t), intent(in) :: thermo
       type(calculation_t), intent(inout) :: total
       logical, intent(inout) :: converged_md
+      real(dp), intent(inout) :: calc_memory_total
+      real(dp), intent(inout) :: calc_memory_max
+      integer, intent(in) :: rank
       character*1024 :: energies_string
       type(md_t) :: md_fake
       integer, allocatable :: species_idx(:)
@@ -297,7 +302,8 @@ contains
 
       if (state%n_sites /= mc%states(current)%n_sites) then
          changed%n_sites = .true.
-         call allocate_calculation(mc%states(current)%n_sites, total, do_%forces)
+         call allocate_calculation(mc%states(current)%n_sites, total, do_%forces, &
+                                   calc_memory_total, calc_memory_max, rank, "total")
       end if
 
       call assign_state(state, mc%states(current))
@@ -328,12 +334,12 @@ contains
 
          call perform_mc_step( &
             changed, &
-            state%positions, &
-            state%species, &
+            state%positions%array, &
+            state%species%array, &
             state%xyz_species, &
-            state%masses, &
-            state%fix_atom, &
-            state%velocities, &
+            state%masses%array, &
+            state%fix_atom%array, &
+            state%velocities%array, &
             md%positions_prev, &
             md%positions_diff, &
             disp, &
@@ -341,10 +347,10 @@ contains
             state%n_local_properties, &
             mc%acceptance, &
             mc%mu_acceptance, &
-            state%local_properties, &
-            mc%states(current)%local_properties, &
-            total%energies, &
-            total%forces, &
+            state%local_properties%array, &
+            mc%states(current)%local_properties%array, &
+            total%energies%array, &
+            total%forces%array, &
             md%forces_prev, &
             state%n_sites, &
             mc%n_mu, &
@@ -360,11 +366,11 @@ contains
             mc%types, &
             species_info%masses_types, &
             species_idx, &
-            mc%states(current)%positions, &
-            mc%states(current)%species, &
+            mc%states(current)%positions%array, &
+            mc%states(current)%species%array, &
             mc%states(current)%xyz_species, &
-            mc%states(current)%fix_atom, &
-            mc%states(current)%masses, &
+            mc%states(current)%fix_atom%array, &
+            mc%states(current)%masses%array, &
             state%a_box, &
             state%b_box, &
             state%c_box, &
@@ -392,6 +398,28 @@ contains
             do_%forces, &
             do_%need_velocities, &
             converged_md)
+
+         ! perform_mc_step reallocates all of these directly (insertion/removal
+         ! moves change the atom count), bypassing tg_alloc's bookkeeping -
+         ! resync every one of them from their actual post-call state.
+         call tg_sync(state%positions, state%memory%total, state%memory%max, "state%positions")
+         call tg_sync(state%species, state%memory%total, state%memory%max, "state%species")
+         call tg_sync(state%masses, state%memory%total, state%memory%max, "state%masses")
+         call tg_sync(state%fix_atom, state%memory%total, state%memory%max, "state%fix_atom")
+         call tg_sync(state%velocities, state%memory%total, state%memory%max, "state%velocities")
+         call tg_sync(state%local_properties, state%memory%total, state%memory%max, "state%local_properties")
+         call tg_sync(total%energies, calc_memory_total, calc_memory_max, "total%energies")
+         call tg_sync(total%forces, calc_memory_total, calc_memory_max, "total%forces")
+         call tg_sync(mc%states(current)%local_properties, mc%states(current)%memory%total, &
+                      mc%states(current)%memory%max, "mc%states(current)%local_properties")
+         call tg_sync(mc%states(current)%positions, mc%states(current)%memory%total, &
+                      mc%states(current)%memory%max, "mc%states(current)%positions")
+         call tg_sync(mc%states(current)%species, mc%states(current)%memory%total, &
+                      mc%states(current)%memory%max, "mc%states(current)%species")
+         call tg_sync(mc%states(current)%fix_atom, mc%states(current)%memory%total, &
+                      mc%states(current)%memory%max, "mc%states(current)%fix_atom")
+         call tg_sync(mc%states(current)%masses, mc%states(current)%memory%total, &
+                      mc%states(current)%memory%max, "mc%states(current)%masses")
       end if
 
       if (state%n_sites /= state%n_sites_prev) then

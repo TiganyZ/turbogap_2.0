@@ -21,7 +21,7 @@ LIB_DIR=lib
 # -D_CHECK_DEALLOCATE
 # -D_DEBUG
 
-F90_OPTS += $(F90_MOD_DIR_OPT) $(INC_DIR)
+F90_OPTS += $(F90_MOD_DIR_OPT) $(INC_DIR) #-D_CHECK_ALLOCATE
 
 PROGRAMS := turbogap
 
@@ -113,7 +113,7 @@ PROG := $(addprefix $(BIN_DIR)/,$(PROGRAMS))
 
 .SUFFIXES:
 .SUFFIXES: .f90 .o
-.PHONY: default all programs clean deepclean libturbogap
+.PHONY: default all programs clean deepclean libturbogap test format format-check
 
 default: libturbogap programs
 
@@ -124,6 +124,102 @@ clean:
 
 deepclean:
 	rm -rf $(BUILD_DIR) $(BIN_DIR) ${INC_DIR} ${LIB_DIR}
+
+# Smoke-tests every scenario under tests_manual/ (serial + 2-rank MPI) against
+# the just-built binary. See tests_manual/run_manual_tests.sh for what "pass"
+# means here (no golden output to diff against - this is a crash/regression
+# smoke test, not a numerical correctness check). Override the per-run
+# timeout with `make test TEST_TIMEOUT=300`.
+TEST_TIMEOUT ?= 60
+test: programs
+	@bash tests_manual/run_manual_tests.sh $(TEST_TIMEOUT)
+
+# Files formatted by fprettify (see .fprettify.rc): explicitly the set of
+# hand-written files actually compiled into turbogap/libturbogap (i.e. the
+# real source paths behind $(SRC), plus the turbogap.f90 entry point).
+# Deliberately NOT a blanket `find src -name '*.f90'`: that also picks up
+# the soap_turbo submodule, vendored third_party/ code (keep matching
+# upstream), src/allocation/tg_memory.f90 (generated from
+# tg_memory_dims.fpp - regenerate it, don't hand-format it), and various
+# unused/experimental prototype files scattered under src/ (src/gpu,
+# src/allocation/test/, src/allocation/allocation.f90, src/allocation/tg_alloc.f90,
+# ...) that were never wired into $(SRC) and aren't real, tested source.
+FPRETTIFY_FILES := \
+	src/control/control.f90 \
+	src/control/control_interface.f90 \
+	src/control/read_control.f90 \
+	src/gap/calculate_gap_soap.f90 \
+	src/gap/gap.f90 \
+	src/gap/gap_interface.f90 \
+	src/gap/local_properties.f90 \
+	src/gap/read_gap.f90 \
+	src/madlib/exp_types.f90 \
+	src/madlib/read_exp.f90 \
+	src/mc/mc_interface.f90 \
+	src/mc/mc_types.f90 \
+	src/mc/mc_utils.f90 \
+	src/mc/read_mc.f90 \
+	src/md/md_interface.f90 \
+	src/md/md_types.f90 \
+	src/md/md_utils.f90 \
+	src/md/read_md.f90 \
+	src/mpi/mpi_utils.f90 \
+	src/neighbors/neighbors_interface.f90 \
+	src/read/read_files.f90 \
+	src/read/read_utils.f90 \
+	src/turbogap.f90 \
+	src/turbogap_main.f90 \
+	src/types/types.f90 \
+	src/utils/calculation.f90 \
+	src/utils/constants.f90 \
+	src/utils/error.f90 \
+	src/utils/functions.f90 \
+	src/utils/kinds.f90 \
+	src/utils/misc.f90 \
+	src/utils/printing.f90 \
+	src/utils/splines.f90 \
+	src/utils/state_interface.f90 \
+	src/utils/timer.f90 \
+	src/utils/timing.f90 \
+	src/vdw/read_vdw.f90 \
+	src/vdw/vdw_interface.f90 \
+	src/vdw/vdw_types.f90 \
+	src/xyz/read_xyz.f90 \
+	src/xyz/write_xyz.f90
+
+format:
+	fprettify -c .fprettify.rc $(FPRETTIFY_FILES)
+
+# Note: fprettify -d always exits 0, and a fatal parse error on one file
+# prints its traceback to stderr while producing no diff at all - so this
+# checks fprettify's own exit code AND stderr content (parse errors),
+# in addition to whether a diff was produced, rather than trusting the diff
+# alone to reflect the real outcome.
+format-check:
+	@diff_output="$$(fprettify -c .fprettify.rc -d $(FPRETTIFY_FILES) 2>/tmp/fprettify-check-err.$$$$)"; \
+	status=$$?; \
+	err_output="$$(cat /tmp/fprettify-check-err.$$$$)"; \
+	rm -f /tmp/fprettify-check-err.$$$$; \
+	ok=1; \
+	if [ $$status -ne 0 ]; then \
+		echo "fprettify exited with status $$status"; \
+		ok=0; \
+	fi; \
+	if echo "$$err_output" | grep -qi "error\|traceback\|exception"; then \
+		echo "$$err_output"; \
+		ok=0; \
+	fi; \
+	if [ -n "$$diff_output" ]; then \
+		echo "$$diff_output"; \
+		ok=0; \
+	fi; \
+	if [ "$$ok" -eq 1 ]; then \
+		echo "All files formatted correctly."; \
+	else \
+		echo; \
+		echo "Formatting issues found above - run 'make format' to fix (or investigate the fprettify error)."; \
+		exit 1; \
+	fi
 
 .SECONDEXPANSION:
 .SECONDARY: $(OBJS)

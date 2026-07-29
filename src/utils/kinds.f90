@@ -25,9 +25,9 @@
 ! HND X   Miguel A. Caro. Phys. Rev. B 100, 024112 (2019)
 ! HND X
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-module kinds 
-implicit none 
+module kinds
+   implicit none
 
    integer, parameter, public :: dp = kind(1.0d0)
 
-end module kinds 
+end module kinds

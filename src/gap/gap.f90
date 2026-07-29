@@ -260,11 +260,11 @@ contains
          !       Loop through distance_2b descriptors
          call time_start(time_2b)
 
-         gap_2b%energies = 0.0_dp
+         gap_2b%energies%array = 0.0_dp
          do i = 1, n_gap_2b
-            this_gap_2b%energies = 0.0_dp
+            this_gap_2b%energies%array = 0.0_dp
             if (do_%forces) then
-               this_gap_2b%forces = 0.0_dp
+               this_gap_2b%forces%array = 0.0_dp
                this_gap_2b%virial = 0.0_dp
 
                call get_2b_energy_and_forces(neighbors%rjs%array(split%j_beg:split%j_end), &
@@ -285,8 +285,8 @@ contains
                                              gap_2b_hypers(i)%species1, &
                                              gap_2b_hypers(i)%species2, &
                                              species_info%species_types, &
-                                             this_gap_2b%energies(split%i_beg:split%i_end), &
-                                             this_gap_2b%forces(1:3, split%i_beg:split%i_end), &
+                                             this_gap_2b%energies%array(split%i_beg:split%i_end), &
+                                             this_gap_2b%forces%array(1:3, split%i_beg:split%i_end), &
                                              this_gap_2b%virial)
             else
 
@@ -308,14 +308,14 @@ contains
                                              gap_2b_hypers(i)%species1, &
                                              gap_2b_hypers(i)%species2, &
                                              species_info%species_types, &
-                                             this_gap_2b%energies(split%i_beg:split%i_end), &
-                                             this_gap_2b%forces, &
+                                             this_gap_2b%energies%array(split%i_beg:split%i_end), &
+                                             this_gap_2b%forces%array, &
                                              this_gap_2b%virial)
             end if
 
-            gap_2b%energies = gap_2b%energies + this_gap_2b%energies
+            gap_2b%energies%array = gap_2b%energies%array + this_gap_2b%energies%array
             if (do_%forces) then
-               gap_2b%forces = gap_2b%forces + this_gap_2b%forces
+               gap_2b%forces%array = gap_2b%forces%array + this_gap_2b%forces%array
                gap_2b%virial = gap_2b%virial + this_gap_2b%virial
             end if
 
@@ -484,9 +484,9 @@ contains
          call time_start(time_core_pot)
 
          do i = 1, n_gap_core_pot
-            this_gap_core_pot%energies = 0.0_dp
+            this_gap_core_pot%energies%array = 0.0_dp
             if (do_%forces) then
-               this_gap_core_pot%forces = 0.0_dp
+               this_gap_core_pot%forces%array = 0.0_dp
                this_gap_core_pot%virial = 0.0_dp
 
                call get_core_pot_energy_and_forces( &
@@ -507,8 +507,8 @@ contains
                   gap_core_pot_hypers(i)%species1, &
                   gap_core_pot_hypers(i)%species2, &
                   species_info%species_types, &
-                  this_gap_core_pot%energies(split%i_beg:split%i_end), &
-                  this_gap_core_pot%forces(1:3, split%i_beg:split%i_end), &
+                  this_gap_core_pot%energies%array(split%i_beg:split%i_end), &
+                  this_gap_core_pot%forces%array(1:3, split%i_beg:split%i_end), &
                   this_gap_core_pot%virial)
 
             else
@@ -531,15 +531,15 @@ contains
                   gap_core_pot_hypers(i)%species1, &
                   gap_core_pot_hypers(i)%species2, &
                   species_info%species_types, &
-                  this_gap_core_pot%energies(split%i_beg:split%i_end), &
-                  this_gap_core_pot%forces, &
+                  this_gap_core_pot%energies%array(split%i_beg:split%i_end), &
+                  this_gap_core_pot%forces%array, &
                   this_gap_core_pot%virial)
 
             end if
 
-            gap_core_pot%energies = gap_core_pot%energies + this_gap_core_pot%energies
+            gap_core_pot%energies%array = gap_core_pot%energies%array + this_gap_core_pot%energies%array
             if (do_%forces) then
-               gap_core_pot%forces = gap_core_pot%forces + this_gap_core_pot%forces
+               gap_core_pot%forces%array = gap_core_pot%forces%array + this_gap_core_pot%forces%array
                gap_core_pot%virial = gap_core_pot%virial + this_gap_core_pot%virial
             end if
 
@@ -709,9 +709,9 @@ contains
          call time_start(time_3b)
 
          do i = 1, n_gap_3b
-            this_gap_3b%energies = 0.0_dp
+            this_gap_3b%energies%array = 0.0_dp
             if (do_%forces) then
-               this_gap_3b%forces = 0.0_dp
+               this_gap_3b%forces%array = 0.0_dp
                this_gap_3b%virial = 0.0_dp
             end if
 
@@ -737,13 +737,13 @@ contains
                                           gap_3b_hypers(i)%species1, &
                                           gap_3b_hypers(i)%species2, &
                                           species_info%species_types, &
-                                          this_gap_3b%energies(split%i_beg:split%i_end), &
-                                          this_gap_3b%forces, &
+                                          this_gap_3b%energies%array(split%i_beg:split%i_end), &
+                                          this_gap_3b%forces%array, &
                                           this_gap_3b%virial)
 
-            gap_3b%energies = gap_3b%energies + this_gap_3b%energies
+            gap_3b%energies%array = gap_3b%energies%array + this_gap_3b%energies%array
             if (do_%forces) then
-               gap_3b%forces = gap_3b%forces + this_gap_3b%forces
+               gap_3b%forces%array = gap_3b%forces%array + this_gap_3b%forces%array
                gap_3b%virial = gap_3b%virial + this_gap_3b%virial
             end if
 

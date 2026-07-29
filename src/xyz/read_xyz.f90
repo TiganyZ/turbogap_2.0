@@ -34,6 +34,7 @@ module read_xyz
    use md_interface, only: reset_velocities
    use state_interface, only: reallocate_state, reallocate_state_supercell
    use printing, only: print_message, print_small_message, print_parameter
+   use tg_memory, only: tg_alloc, tg_dealloc
 
 contains
 
@@ -97,7 +98,7 @@ contains
 
          if (.not. do_%recalculate_supercell) then
                                                          !! Reallocate the state
-            call reallocate_state(state, state%n_local_properties, do_%need_velocities, state%n_sites)
+            call reallocate_state(state, state%n_local_properties, do_%need_velocities, state%n_sites, rank)
 
             call read_xyz_lines(xyz_file, iostatus, do_, state, species_info, &
                                 properties, has_velocities, do_%need_velocities)
@@ -106,7 +107,7 @@ contains
             !   provided
             if (do_%need_velocities .and. .not. has_velocities) then
                call reset_velocities(state, thermo, rank)
-            else if (do_%need_velocities .and. all(state%velocities == 0.0_dp)) then
+            else if (do_%need_velocities .and. all(state%velocities%array(1:3, 1:state%n_sites) == 0.0_dp)) then
                call reset_velocities(state, thermo, rank)
             end if
                          !!   Check if there are more structures in the xyz file
@@ -146,18 +147,18 @@ contains
                                       *state%indices(3)
 
             !call reallocate_state_supercell(state, do_%need_velocities, state%n_sites_supercell)
-            call reallocate_state_supercell(state, state%n_sites_supercell)
-            call set_supercell(state) !, do_%need_velocities)
+            call reallocate_state_supercell(state, state%n_sites_supercell, rank)
+            call set_supercell(state, rank) !, do_%need_velocities)
          else
-            call set_normal_cell(state) !, do_%need_velocities, do_%supercell_check_only)
+            call set_normal_cell(state, rank) !, do_%need_velocities, do_%supercell_check_only)
          end if
 
          !  FIXME: This is perhaps not the most efficient way to select only one atom, fix in the future
          if (.not. do_%all_atoms) then
             state%n_sites = 1
-            dist(1:3) = state%positions(1:3, 1)
-            state%positions(1:3, 1) = state%positions(1:3, do_%which_atom)
-            state%positions(1:3, do_%which_atom) = dist(1:3)
+            dist(1:3) = state%positions%array(1:3, 1)
+            state%positions%array(1:3, 1) = state%positions%array(1:3, do_%which_atom)
+            state%positions%array(1:3, do_%which_atom) = dist(1:3)
          end if
 
       else
@@ -168,9 +169,11 @@ contains
          state%c_box = state%c_box*dfloat(state%indices_prev(3))
       end if
 
-      if (reallocate .or. .not. allocated(state%positions_wrapped)) then
-         if (allocated(state%positions_wrapped)) deallocate (state%positions_wrapped)
-         allocate (state%positions_wrapped(1:3, size(state%positions, 2)), source=state%positions)
+      if (reallocate .or. .not. state%positions_wrapped%allocated) then
+         call tg_alloc(state%positions_wrapped, [3, state%positions%used_dims(2)], &
+                       state%memory%total, state%memory%max, rank, "state%positions_wrapped")
+         state%positions_wrapped%array(1:3, 1:state%positions%used_dims(2)) = &
+            state%positions%array(1:3, 1:state%positions%used_dims(2))
       end if
 
       ! Decide what to do next time!
@@ -183,9 +186,10 @@ contains
       end if
    end subroutine read_xyz_file
 
-   subroutine recalculate_supercell(state, rcut_max)
+   subroutine recalculate_supercell(state, rcut_max, rank)
       type(state_t), intent(inout) :: state
       real(dp), intent(in) :: rcut_max
+      integer, intent(in) :: rank
 
       state%indices_prev = state%indices
 
@@ -206,16 +210,18 @@ contains
                                    *state%indices(3)
 
          !call reallocate_state_supercell(state, do_%need_velocities, state%n_sites_supercell)
-         call reallocate_state_supercell(state, state%n_sites_supercell)
+         call reallocate_state_supercell(state, state%n_sites_supercell, rank)
 
-         call set_supercell(state) !, do_%need_velocities)
+         call set_supercell(state, rank) !, do_%need_velocities)
 
       else
-         call set_normal_cell(state) !, do_%need_velocities, do_%supercell_check_only)
+         call set_normal_cell(state, rank) !, do_%need_velocities, do_%supercell_check_only)
       end if
 
-      if (allocated(state%positions_wrapped)) deallocate (state%positions_wrapped)
-      allocate (state%positions_wrapped, source=state%positions)
+      call tg_alloc(state%positions_wrapped, [3, state%positions%used_dims(2)], &
+                    state%memory%total, state%memory%max, rank, "state%positions_wrapped")
+      state%positions_wrapped%array(1:3, 1:state%positions%used_dims(2)) = &
+         state%positions%array(1:3, 1:state%positions%used_dims(2))
    end subroutine recalculate_supercell
 
    subroutine read_xyz_lines(xyz_file, iostatus, do_, state, species_info, properties, &
@@ -242,16 +248,16 @@ contains
          read (xyz_file, '(A)') cjunk1024
          if (need_velocities) then
             call read_xyz_line(properties, cjunk1024, i_char, state &
-                               %positions(1:3, i), state%velocities(1:3, i), state &
-                               %fix_atom(1:3, i), has_velocities, state &
-                               %masses(i), species_info%masses_from_xyz)
+                               %positions%array(1:3, i), state%velocities%array(1:3, i), state &
+                               %fix_atom%array(1:3, i), has_velocities, state &
+                               %masses%array(i), species_info%masses_from_xyz)
             if (species_info%masses_from_xyz) then
-               state%masses(i) = state%masses(i)*103.6426965268d0
+               state%masses%array(i) = state%masses%array(i)*103.6426965268d0
                do_%write_masses = .true.
             end if
          else
             call read_xyz_line(properties, cjunk1024, i_char, state &
-                               %positions(1:3, i), rjunk(1:3), ljunk(1:3), &
+                               %positions%array(1:3, i), rjunk(1:3), ljunk(1:3), &
                                has_velocities, rjunk1d, species_info%masses_from_xyz)
          end if
          do j = 1, species_info%n_species
@@ -259,11 +265,11 @@ contains
                !          species_multiplicity(i) = species_multiplicity(i) + 1
                !          species(species_multiplicity(i), i) = j
                state%xyz_species(i) = species_info%species_types(j)
-               state%species(i) = j
+               state%species%array(i) = j
                !         This is commented out because we also need masses with nested sampling when used in combination with MD
                !          if( do_md .and. .not. masses_from_xyz )then
                if (.not. species_info%masses_from_xyz) then
-                  state%masses(i) = species_info%masses_types(j)
+                  state%masses%array(i) = species_info%masses_types(j)
                end if
                !          exit
             end if
@@ -279,18 +285,19 @@ contains
       end do
    end subroutine read_xyz_lines
 
-   subroutine set_normal_cell(state) !, need_velocities!, supercell_check_only)
+   subroutine set_normal_cell(state, rank) !, need_velocities!, supercell_check_only)
       type(state_t), intent(inout) :: state
+      integer, intent(in) :: rank
       !logical, intent(in) :: need_velocities
       !logical, intent(in) :: supercell_check_only
 
       state%n_sites_supercell = state%n_sites
       if (allocated(state%xyz_species_supercell)) deallocate (state%xyz_species_supercell)
-      if (allocated(state%species_supercell)) deallocate (state%species_supercell)
       allocate (state%xyz_species_supercell(1:state%n_sites_supercell))
-      allocate (state%species_supercell(1:state%n_sites_supercell))
+      call tg_alloc(state%species_supercell, [state%n_sites_supercell], &
+                    state%memory%total, state%memory%max, rank, "state%species_supercell")
       state%xyz_species_supercell = state%xyz_species
-      state%species_supercell = state%species
+      state%species_supercell%array(1:state%n_sites_supercell) = state%species%array(1:state%n_sites_supercell)
       !      allocate( species_supercell(1:max_species_multiplicity, 1:state % n_sites_supercell) )
       !      species_supercell = species
       ! if (supercell_check_only) then
@@ -313,8 +320,9 @@ contains
       ! end if
    end subroutine set_normal_cell
 
-   subroutine set_supercell(state)!, need_velocities)
+   subroutine set_supercell(state, rank)!, need_velocities)
       type(state_t), intent(inout) :: state
+      integer, intent(in) :: rank
       !logical, intent(in) :: need_velocities
       integer :: counter
       integer :: i, k2, j2, i2
@@ -325,22 +333,35 @@ contains
             do k2 = 1, state%indices(3)
                do i = 1, state%n_sites
                   counter = counter + 1
-                  state%positions_supercell(1:3, counter) = state%positions(1:3, i) + dfloat(i2 - 1)*state%a_box(1:3) &
-                                                            + dfloat(j2 - 1)*state%b_box(1:3) &
-                                                            + dfloat(k2 - 1)*state%c_box(1:3)
+                  state%positions_supercell%array(1:3, counter) = state%positions%array(1:3, i) &
+                                                                  + dfloat(i2 - 1)*state%a_box(1:3) &
+                                                                  + dfloat(j2 - 1)*state%b_box(1:3) &
+                                                                  + dfloat(k2 - 1)*state%c_box(1:3)
                   ! if (need_velocities) then
                   !    state%velocities_supercell(1:3, counter) = state%velocities(1:3, i)
                   ! end if
 
                   !              species_supercell(:, counter) = species(:, i)
                   state%xyz_species_supercell(counter) = state%xyz_species(i)
-                  state%species_supercell(counter) = state%species(i)
+                  state%species_supercell%array(counter) = state%species%array(i)
                end do
             end do
          end do
       end do
 
-      call move_alloc(state%positions_supercell, state%positions)
+      ! Transfer ownership of positions_supercell's buffer into positions
+      ! (mirrors collect_neighbors's n_neigh_global -> n_neigh transfer):
+      ! free positions' old buffer via tg_dealloc first so memory_total isn't
+      ! double-counted, then move the already-tracked positions_supercell
+      ! buffer across.
+      call tg_dealloc(state%positions, state%memory%total, rank, "state%positions")
+      call move_alloc(state%positions_supercell%array, state%positions%array)
+      state%positions%dims = state%positions_supercell%dims
+      state%positions%used_dims = state%positions_supercell%used_dims
+      state%positions%allocated = .true.
+      state%positions_supercell%dims = 0
+      state%positions_supercell%used_dims = 0
+      state%positions_supercell%allocated = .false.
 
       ! if (need_velocities) then
       !    call move_alloc(state%velocities_supercell, state%velocities)

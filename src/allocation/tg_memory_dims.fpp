@@ -87,6 +87,14 @@ module tg_memory
       #:endfor
    end interface tg_dealloc
 
+   interface tg_sync
+      #:for PREC in PRECISIONS
+         #:for RANK in RANKS
+            module procedure tg_sync_${RANK}$_${PREC}$
+         #:endfor
+      #:endfor
+   end interface tg_sync
+
    interface tg_allocate
       #:for PREC in PRECISIONS
          #:for RANK in RANKS
@@ -265,6 +273,67 @@ contains
             tg_array%allocated = .false.
 
          end subroutine tg_dealloc_${RANK}$_${PREC}$
+
+      #:endfor
+   #:endfor
+
+   !! tg_sync resyncs a tg_array's dims/used_dims/allocated bookkeeping (and the
+   !! memory_total/memory_max ledger) from the actual current state of %array,
+   !! for when external code has (re)allocated %array directly instead of going
+   !! through tg_alloc/tg_dealloc - e.g. a subroutine that takes %array as a
+   !! plain allocatable dummy argument and reallocates it itself. Call this
+   !! right after such a call returns, before any further tg_alloc/tg_dealloc
+   !! calls on the same tg_array (otherwise those would make decisions based on
+   !! stale dims and could under- or over-count memory, or worse, believe a
+   !! smaller physical buffer is still large enough).
+
+   #:for PREC in PRECISIONS
+      #:for RANK in RANKS
+
+         subroutine tg_sync_${RANK}$_${PREC}$ (tg_array, memory_total, memory_max, name)
+            character(len=*), intent(in) :: name
+            type(tg_array_${RANK}$_${PREC}$), intent(inout) :: tg_array
+            real(dp), intent(inout) :: memory_total
+            real(dp), intent(inout) :: memory_max
+            ${size_def(RANK)}$
+            integer :: dims(${RANK}$)
+            real(dp) :: prev_array_size
+            real(dp) :: total_array_size
+
+            ! Bytes currently accounted for under the pre-sync dims (0 if never allocated)
+            prev_array_size = 0.0_dp
+            if (any(tg_array%dims > 0)) then
+               sizes = tg_array%dims
+               prev_array_size = ${sizes_size_dp(RANK)}$*tg_array%size_type
+            end if
+
+            if (allocated(tg_array%array)) then
+               ${size_assigntg(RANK)}$
+               dims = sizes
+               total_array_size = ${sizes_size_dp(RANK)}$*tg_array%size_type
+
+               memory_total = memory_total - prev_array_size + total_array_size
+               memory_max = max(memory_total, memory_max)
+
+               tg_array%dims = dims
+               tg_array%used_dims = dims
+               tg_array%allocated = .true.
+
+#ifdef _CHECK_ALLOCATE
+               write (*, *) 'TGSYNC type ', name, ' resynced dims ', dims
+#endif
+            else
+               memory_total = memory_total - prev_array_size
+               tg_array%dims = 0
+               tg_array%used_dims = 0
+               tg_array%allocated = .false.
+
+#ifdef _CHECK_ALLOCATE
+               write (*, *) 'TGSYNC type ', name, ' array not allocated - reset to 0'
+#endif
+            end if
+
+         end subroutine tg_sync_${RANK}$_${PREC}$
 
       #:endfor
    #:endfor

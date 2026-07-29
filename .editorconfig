@@ -1,0 +1,24 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+# Matches the fprettify config in .fprettify.rc (indent = 3).
+[*.{f90,F90,fpp,f,for,ftn,f95,f03}]
+indent_size = 3
+
+[Makefile]
+indent_style = tab
+
+[makefiles/*]
+indent_style = tab
+
+# Vendored/external code and generated output keep their upstream formatting.
+[{src/soap_turbo/**,src/third_party/**,src/allocation/tg_memory.f90}]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_size = unset

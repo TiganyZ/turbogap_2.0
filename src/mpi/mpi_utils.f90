@@ -32,6 +32,7 @@ module mpi_utils
    use control, only: control_t
    use state_interface, only: reallocate_state
    use timing, only: time_start, time_end
+   use tg_memory, only: tg_alloc, tg_dealloc, tg_sync
 #ifdef _MPIF90
    use mpi
 #endif
@@ -344,11 +345,19 @@ contains
 
       call MPI_bcast(state%E_kinetic, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
-      call synchronize_array(state%positions, rank)
-      call synchronize_array(state%positions_supercell, rank)
-      call synchronize_array(state%local_properties, rank)
+      ! synchronize_array (re)allocates its bare-array argument directly on
+      ! non-root ranks, bypassing tg_alloc's bookkeeping - tg_sync resyncs
+      ! dims/used_dims/allocated and the memory ledger from each array's actual
+      ! post-call state.
+      call synchronize_array(state%positions%array, rank)
+      call tg_sync(state%positions, state%memory%total, state%memory%max, "state%positions")
+      call synchronize_array(state%positions_supercell%array, rank)
+      call tg_sync(state%positions_supercell, state%memory%total, state%memory%max, "state%positions_supercell")
+      call synchronize_array(state%local_properties%array, rank)
+      call tg_sync(state%local_properties, state%memory%total, state%memory%max, "state%local_properties")
       ! call synchronize_array(state%local_properties_cart_der, rank)
-      call synchronize_array(state%this_local_properties, rank)
+      call synchronize_array(state%this_local_properties%array, rank)
+      call tg_sync(state%this_local_properties, state%memory%total, state%memory%max, "state%this_local_properties")
       ! if (allocated(state%local_properties_cart_der)) deallocate (state%local_properties_cart_der)
       ! if (allocated(state%this_local_properties_cart_der)) deallocate (state%this_local_properties_cart_der)
 
@@ -357,55 +366,68 @@ contains
       ! if ( rank  )
       ! call synchronize_array(state%local_property_labels, rank)
 
-      call synchronize_array(state%species, rank)
-      call synchronize_array(state%species_supercell, rank)
+      call synchronize_array(state%species%array, rank)
+      call tg_sync(state%species, state%memory%total, state%memory%max, "state%species")
+      call synchronize_array(state%species_supercell%array, rank)
+      call tg_sync(state%species_supercell, state%memory%total, state%memory%max, "state%species_supercell")
       call synchronize_array(state%xyz_species, rank)
       call synchronize_array(state%xyz_species_supercell, rank)
-      call synchronize_array(state%fix_atom, rank)
+      call synchronize_array(state%fix_atom%array, rank)
+      call tg_sync(state%fix_atom, state%memory%total, state%memory%max, "state%fix_atom")
 
 #endif
    end subroutine synchronize_state
 
-   subroutine allocate_state(state, do_)
+   subroutine allocate_state(state, do_, rank)
+      !! Dead code (never called) - kept compiling with tg_alloc.
       implicit none
-      type(state_t), intent(out)   :: state
+      type(state_t), intent(inout)   :: state
       type(control_t), intent(in) :: do_
+      integer, intent(in) :: rank
 
-      allocate (state%positions(1:3, 1:state%n_sites))
-      allocate (state%species(1:state%n_sites))
+      call tg_alloc(state%positions, [3, state%n_sites], state%memory%total, state%memory%max, rank, "state%positions")
+      call tg_alloc(state%species, [state%n_sites], state%memory%total, state%memory%max, rank, "state%species")
       allocate (state%xyz_species(1:state%n_sites))
-      allocate (state%fix_atom(1:3, 1:state%n_sites))
+      call tg_alloc(state%fix_atom, [3, state%n_sites], state%memory%total, state%memory%max, rank, "state%fix_atom")
       if (do_%need_velocities) then
-         allocate (state%velocities(1:3, 1:state%n_sites))
-         allocate (state%velocities_supercell(1:3, 1:state%n_sites_supercell))
-         allocate (state%masses(1:state%n_sites))
+         call tg_alloc(state%velocities, [3, state%n_sites], state%memory%total, state%memory%max, rank, "state%velocities")
+         call tg_alloc(state%velocities_supercell, [3, state%n_sites_supercell], &
+                       state%memory%total, state%memory%max, rank, "state%velocities_supercell")
+         call tg_alloc(state%masses, [state%n_sites], state%memory%total, state%memory%max, rank, "state%masses")
       end if
-      allocate (state%positions_supercell(1:3, 1:state%n_sites_supercell))
-      allocate (state%species_supercell(1:state%n_sites_supercell))
+      call tg_alloc(state%positions_supercell, [3, state%n_sites_supercell], &
+                    state%memory%total, state%memory%max, rank, "state%positions_supercell")
+      call tg_alloc(state%species_supercell, [state%n_sites_supercell], &
+                    state%memory%total, state%memory%max, rank, "state%species_supercell")
       allocate (state%xyz_species_supercell(1:state%n_sites_supercell))
 
    end subroutine allocate_state
 
-   subroutine allocate_state_memory(state, do_, memory)
+   subroutine allocate_state_memory(state, do_, memory, rank)
+      !! Dead code (never called) - kept compiling with tg_alloc.
       implicit none
       type(state_t), intent(inout)   :: state
       type(control_t), intent(in) :: do_
       type(memory_t), intent(inout)  :: memory
+      integer, intent(in) :: rank
 
 #ifdef _CHECK_DEALLOCATE
-      call deallocate_state(state, do)
+      call deallocate_state(state, do_, memory, rank)
 #endif
 
-      allocate (state%positions(1:3, 1:state%n_sites))
-      allocate (state%species(1:state%n_sites))
+      call tg_alloc(state%positions, [3, state%n_sites], state%memory%total, state%memory%max, rank, "state%positions")
+      call tg_alloc(state%species, [state%n_sites], state%memory%total, state%memory%max, rank, "state%species")
       allocate (state%xyz_species(1:state%n_sites))
-      allocate (state%fix_atom(1:3, 1:state%n_sites))
+      call tg_alloc(state%fix_atom, [3, state%n_sites], state%memory%total, state%memory%max, rank, "state%fix_atom")
       if (do_%need_velocities) then
-         allocate (state%velocities(1:3, 1:state%n_sites))
-         allocate (state%velocities_supercell(1:3, 1:state%n_sites_supercell))
+         call tg_alloc(state%velocities, [3, state%n_sites], state%memory%total, state%memory%max, rank, "state%velocities")
+         call tg_alloc(state%velocities_supercell, [3, state%n_sites_supercell], &
+                       state%memory%total, state%memory%max, rank, "state%velocities_supercell")
       end if
-      allocate (state%positions_supercell(1:3, 1:state%n_sites_supercell))
-      allocate (state%species_supercell(1:state%n_sites_supercell))
+      call tg_alloc(state%positions_supercell, [3, state%n_sites_supercell], &
+                    state%memory%total, state%memory%max, rank, "state%positions_supercell")
+      call tg_alloc(state%species_supercell, [state%n_sites_supercell], &
+                    state%memory%total, state%memory%max, rank, "state%species_supercell")
       allocate (state%xyz_species_supercell(1:state%n_sites_supercell))
 
 #ifdef CHECK_MEMORY
@@ -416,50 +438,23 @@ contains
 
    end subroutine allocate_state_memory
 
-   subroutine deallocate_state(state, do_, memory)
+   subroutine deallocate_state(state, do_, memory, rank)
+      !! Dead code (never called) - kept compiling with tg_dealloc.
       implicit none
       type(state_t), intent(inout) :: state
       type(control_t), intent(in)  :: do_
       type(memory_t), intent(inout)  :: memory
+      integer, intent(in) :: rank
 
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%positions)) &
-#endif
-         deallocate (state%positions)
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%positions_supercell)) &
-#endif
-         deallocate (state%positions_supercell)
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%velocities)) &
-#endif
-         if(do_%md) &
-         deallocate (state%velocities)
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%velocities_supercell)) &
-#endif
-         if(do_%md) &
-         deallocate (state%velocities_supercell)
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%species)) &
-#endif
-         deallocate (state%species)
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%species_supercell)) &
-#endif
-         deallocate (state%species_supercell)
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%xyz_species)) &
-#endif
-         deallocate (state%xyz_species)
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%xyz_species_supercell)) &
-#endif
-         deallocate (state%xyz_species_supercell)
-#ifdef _CHECK_DEALLOCATE
-      if (allocated(state%fix_atom)) &
-#endif
-         deallocate (state%fix_atom)
+      call tg_dealloc(state%positions, state%memory%total, rank, "state%positions")
+      call tg_dealloc(state%positions_supercell, state%memory%total, rank, "state%positions_supercell")
+      if (do_%md) call tg_dealloc(state%velocities, state%memory%total, rank, "state%velocities")
+      if (do_%md) call tg_dealloc(state%velocities_supercell, state%memory%total, rank, "state%velocities_supercell")
+      call tg_dealloc(state%species, state%memory%total, rank, "state%species")
+      call tg_dealloc(state%species_supercell, state%memory%total, rank, "state%species_supercell")
+      if (allocated(state%xyz_species)) deallocate (state%xyz_species)
+      if (allocated(state%xyz_species_supercell)) deallocate (state%xyz_species_supercell)
+      call tg_dealloc(state%fix_atom, state%memory%total, rank, "state%fix_atom")
    end subroutine deallocate_state
 
    subroutine broadcast_state(state, do_, rank)
@@ -481,13 +476,13 @@ contains
       if (state%n_sites /= state%n_sites_prev) then
          if (rank /= 0) then
             call reallocate_state(state, state%n_local_properties, do_%need_velocities, state%n_sites, &
-                                  state%n_sites_supercell)
+                                  rank, state%n_sites_supercell)
          end if
       end if
 
       state%n_sites_prev = state%n_sites
 
-      call MPI_bcast(state%positions, state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%positions%array, state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
       call MPI_bcast(state%a_box, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
       call MPI_bcast(state%b_box, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
@@ -496,11 +491,11 @@ contains
 
       ! call MPI_bcast(state%positions_supercell, state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
-      call MPI_bcast(state%species, state%n_sites, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-      call MPI_bcast(state%fix_atom, state%n_sites, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%species%array, state%n_sites, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%fix_atom%array, state%n_sites, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
       call MPI_bcast(state%xyz_species, 8*state%n_sites, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
-      call MPI_bcast(state%species_supercell, state%n_sites_supercell, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call MPI_bcast(state%species_supercell%array, state%n_sites_supercell, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
       call MPI_bcast(state%xyz_species_supercell, 8*state%n_sites_supercell, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
       ! NOTE: Don't need to broadcast velocities as only used by rank 0
@@ -509,8 +504,8 @@ contains
       !    call MPI_bcast(state%velocities, state%n_sites, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
       ! end if
 
-      if (allocated(state%local_properties)) then
-         call MPI_bcast(state%local_properties, state%n_sites*state%n_local_properties, &
+      if (state%local_properties%allocated) then
+         call MPI_bcast(state%local_properties%array, state%n_sites*state%n_local_properties, &
                         MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
       end if
 
@@ -528,19 +523,19 @@ contains
       energy = 0.0_dp
 
 #ifdef _MPIF90
-      call mpi_reduce(calc%energies, this_calc%energies, &
+      call mpi_reduce(calc%energies%array(1:n_sites), this_calc%energies%array(1:n_sites), &
                       n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      calc%energies = this_calc%energies
+      calc%energies%array(1:n_sites) = this_calc%energies%array(1:n_sites)
 
 #endif
-      energy = sum(calc%energies)
+      energy = sum(calc%energies%array(1:n_sites))
 
 #ifdef _MPIF90
       if (do_forces) then
 
-         call mpi_reduce(calc%forces, this_calc%forces, &
+         call mpi_reduce(calc%forces%array(1:3, 1:n_sites), this_calc%forces%array(1:3, 1:n_sites), &
                          3*n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-         calc%forces = this_calc%forces
+         calc%forces%array(1:3, 1:n_sites) = this_calc%forces%array(1:3, 1:n_sites)
          call mpi_reduce(calc%virial, this_calc%virial, &
                          9, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          calc%virial = this_calc%virial
@@ -566,7 +561,7 @@ contains
 
       call mpi_bcast(rebuild_neighbors_list, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
-      call mpi_bcast(state%positions, 3*state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      call mpi_bcast(state%positions%array, 3*state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
       ! call mpi_bcast(state%velocities, 3*state%n_sites, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 

@@ -278,7 +278,7 @@ contains
 !          do i = split%i_beg, split%i_end
 !             do j = 1, species_info%n_species
 !                if (state%xyz_species(i) == species_info%species_types(j)) then
-!                   gap_soap%energies(i) = species_info%e0(j)
+!                   gap_soap%energies%array(i) = species_info%e0(j)
 !                end if
 !             end do
 !          end do
@@ -289,9 +289,9 @@ contains
 ! #ifdef _MPIF90
 
 !       call time_start(time_mpi)
-!    call mpi_reduce(gap_soap%energies, this_gap_soap%energies, state%n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!    call mpi_reduce(gap_soap%energies%array, this_gap_soap%energies%array, state%n_sites, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 !       call time_end(time_mpi)
-!       gap_soap%energies = this_gap_soap%energies
+!       gap_soap%energies%array = this_gap_soap%energies%array
 ! #endif
 
       do i = 1, n_soap
@@ -383,8 +383,8 @@ contains
                               soap_turbo_hypers(i)%has_local_properties, &
                               soap_turbo_hypers(i)%n_local_properties, &
                               soap_turbo_hypers(i)%local_property_models, &
-                              this_gap_soap%energies, &
-                              this_gap_soap%forces, &
+                              this_gap_soap%energies%array, &
+                              this_gap_soap%forces%array, &
                               this_local_properties, &
                               this_local_properties_cart_der, &
                               ! this_local_properties_pt, &
@@ -399,7 +399,7 @@ contains
                               time_soap, &
                               time_local_properties)
 
-            gap_soap%energies = gap_soap%energies + this_gap_soap%energies
+            gap_soap%energies%array = gap_soap%energies%array + this_gap_soap%energies%array
 
             if (soap_turbo_hypers(i)%has_local_properties) then
 
@@ -415,7 +415,7 @@ contains
 
             end if
             if (do_%forces) then
-               gap_soap%forces = gap_soap%forces + this_gap_soap%forces
+               gap_soap%forces%array = gap_soap%forces%array + this_gap_soap%forces%array
                gap_soap%virial = gap_soap%virial + this_gap_soap%virial
             end if
 

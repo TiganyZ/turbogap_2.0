@@ -85,7 +85,7 @@ module turbogap_main
    !   Params_XPS, Params_XRD, Params_PDF, Params_EXP
 
    use neighbors_interface, only: build_neighbors_list, collect_neighbors, deallocate_neighbors
-   use tg_memory, only: tg_print_memory
+   use tg_memory, only: tg_print_memory, tg_sync
 
    use calculate_gap_soap_mod, only: calculate_gap_soap, calculate_e0, reset_local_properties
    use gap, only: calculate_gap_2b, calculate_gap_3b, calculate_gap_core_pot
@@ -186,6 +186,10 @@ contains
       type(gap_core_pot_t), allocatable :: gap_core_pot_hypers(:)
 
                                     !! Containers for energies forces and virial
+                                    !! calc_memory tracks bytes for every calculation_t
+                                    !! instance below plus energies_e0/this_energies_e0,
+                                    !! since they're all allocated/reset together.
+      type(memory_t)      :: calc_memory
       type(calculation_t) :: total
       type(calculation_t) :: gap_soap
       type(calculation_t) :: gap_2b
@@ -386,11 +390,16 @@ contains
                                   state%n_local_properties_tot, &
                                   n_gap_soap, gap_soap_hypers, &
                                   state%local_property_labels, &
-                                  state%local_property_indexes, &
+                                  state%local_property_indexes%array, &
                                   options_exp%n_exp, exp_data, &
                                   exp_indexes, &
                                   lp_indexes, &
                                   options_vdw, options_xps)
+
+      ! check_local_properties reallocates local_property_indexes directly
+      ! (plain allocatable dummy) - resync tg_alloc's bookkeeping.
+      call tg_sync(state%local_property_indexes, state%memory%total, state%memory%max, &
+                   "state%local_property_indexes")
 
       call time_end(time%io)
 
@@ -554,7 +563,7 @@ contains
                                         md%randomize_velocities, &
                                         do_%md, &
                                         md%i_step, &
-                                        allocated(state%velocities))
+                                        allocated(state%velocities%array))
 
          if (perform%randomize_velocities) then
             call reset_velocities(state, thermo, rank)
@@ -563,7 +572,7 @@ contains
 ! #ifdef _MPIF90
 !             call time_start(time%mpi)
 
-!             call mpi_bcast(state%positions, 3*state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+!             call mpi_bcast(state%positions%array, 3*state%n_sites_supercell, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
 !             call time_end(time%mpi)
 ! #endif
@@ -677,7 +686,8 @@ contains
                                        this_total, &
                                        this_gap_soap, this_gap_2b, this_gap_3b, &
                                        this_gap_core_pot, &
-                                       this_xrd, this_xps, this_vdw)
+                                       this_xrd, this_xps, this_vdw, &
+                                       calc_memory%total, calc_memory%max, rank)
          else
                                               !! Reinitialize calculation arrays
             call reset_calculations(perform, do_%forces, &
@@ -721,26 +731,39 @@ contains
                                     params, &
                                     gap_soap, this_gap_soap, &
                                     state%n_local_properties, &
-                                    state%local_property_indexes, &
-                                    state%local_properties, state%this_local_properties, &
+                                    state%local_property_indexes%array, &
+                                    state%local_properties%array, state%this_local_properties%array, &
                                     ! this_local_properties_pt, &
-                                    state%local_properties_cart_der, &
-                                    state%this_local_properties_cart_der, &
+                                    state%local_properties_cart_der%array, &
+                                    state%this_local_properties_cart_der%array, &
                                     ! this_local_properties_cart_der_pt, &
                                     time%soap, &
                                     time%gap_soap, &
                                     time%mpi, &
                                     time%local_properties)
 
+            ! calculate_gap_soap reallocates local_properties/this_local_properties/
+            ! local_properties_cart_der/this_local_properties_cart_der directly
+            ! (they're plain allocatable dummies there), bypassing tg_alloc's
+            ! bookkeeping on the tg_array wrapper - resync it from the arrays'
+            ! actual post-call state before anything else touches these fields.
+            call tg_sync(state%local_properties, state%memory%total, state%memory%max, "state%local_properties")
+            call tg_sync(state%this_local_properties, state%memory%total, state%memory%max, &
+                         "state%this_local_properties")
+            call tg_sync(state%local_properties_cart_der, state%memory%total, state%memory%max, &
+                         "state%local_properties_cart_der")
+            call tg_sync(state%this_local_properties_cart_der, state%memory%total, state%memory%max, &
+                         "state%this_local_properties_cart_der")
+
             ! if (perform%local_properties) then
 
             !    if (perform%reallocate .or. changed%n_sites) then
-            !       if (allocated(state%local_properties)) then
-            !          deallocate (state%local_properties)
+            !       if (allocated(state%local_properties%array)) then
+            !          deallocate (state%local_properties%array)
             !       end if
-            !       allocate (state%local_properties, source=local_properties)
+            !       allocate (state%local_properties%array, source=local_properties)
             !    else
-            !       state%local_properties = local_properties
+            !       state%local_properties%array = local_properties
             !    end if
 
             ! end if
@@ -759,7 +782,7 @@ contains
 
          if (perform%gap_2b) then
             call calculate_gap_2b(neighbors, n_gap_2b, gap_2b_hypers, do_, &
-                                  species_info, state%species, split, gap_2b, this_gap_2b, &
+                                  species_info, state%species%array, split, gap_2b, this_gap_2b, &
                                   time%gap_2b)
          end if
 
@@ -775,7 +798,7 @@ contains
 
          if (perform%gap_3b) then
             call calculate_gap_3b(state%n_sites, neighbors, n_gap_3b, gap_3b_hypers, do_, &
-                                  species_info, state%species, split, gap_3b, this_gap_3b, time%gap_3b)
+                                  species_info, state%species%array, split, gap_3b, this_gap_3b, time%gap_3b)
          end if
 
 #ifdef _DEBUG
@@ -790,7 +813,7 @@ contains
 
          if (perform%gap_core_pot) then
             call calculate_gap_core_pot(state%n_sites, neighbors, n_gap_core_pot, &
-                                        gap_core_pot_hypers, do_, species_info, state%species, split, &
+                                        gap_core_pot_hypers, do_, species_info, state%species%array, split, &
                                         gap_core_pot, this_gap_core_pot, time%gap_core_pot)
          end if
 
@@ -805,7 +828,7 @@ contains
                                                                           !! vdw
          if (perform%vdw) then
             call get_vdw_energy_and_forces(state, species_info, this_vdw, vdw, options_vdw, &
-                                           neighbors, state%local_properties_cart_der, lp_indexes, split, do_, &
+                                           neighbors, state%local_properties_cart_der%array, lp_indexes, split, do_, &
                                            time%vdw)
          end if
 
@@ -888,57 +911,71 @@ contains
 
          call time_end(time%mpi)
 
-         state%energies%e0 = sum(energies_e0)
-         total%energies = total%energies + energies_e0
+         ! calculation_t buffers (and energies_e0/this_energies_e0) may each be
+         ! overallocated to a different physical capacity than n_sites - bound
+         ! every combination explicitly to (1:state%n_sites) rather than
+         ! operating on the whole (possibly mismatched-shape) physical arrays.
+         state%energies%e0 = sum(energies_e0(1:state%n_sites))
+         total%energies%array(1:state%n_sites) = total%energies%array(1:state%n_sites) + energies_e0(1:state%n_sites)
 
          if (perform%gap_soap) then
-            total%energies = total%energies + gap_soap%energies
+            total%energies%array(1:state%n_sites) = total%energies%array(1:state%n_sites) &
+                                                    + gap_soap%energies%array(1:state%n_sites)
          end if
 
          if (perform%gap_2b) then
-            total%energies = total%energies + gap_2b%energies
+            total%energies%array(1:state%n_sites) = total%energies%array(1:state%n_sites) &
+                                                    + gap_2b%energies%array(1:state%n_sites)
          end if
 
          if (perform%gap_3b) then
-            total%energies = total%energies + gap_3b%energies
+            total%energies%array(1:state%n_sites) = total%energies%array(1:state%n_sites) &
+                                                    + gap_3b%energies%array(1:state%n_sites)
          end if
 
          if (perform%gap_core_pot) then
-            total%energies = total%energies + gap_core_pot%energies
+            total%energies%array(1:state%n_sites) = total%energies%array(1:state%n_sites) &
+                                                    + gap_core_pot%energies%array(1:state%n_sites)
          end if
 
          if (perform%vdw) then
-            total%energies = total%energies + vdw%energies
+            total%energies%array(1:state%n_sites) = total%energies%array(1:state%n_sites) &
+                                                    + vdw%energies%array(1:state%n_sites)
          end if
 
-         total%energy = sum(total%energies)
+         total%energy = sum(total%energies%array(1:state%n_sites))
          state%energy = total%energy
          state%energies%total = total%energy
 
          if (do_%forces) then
 
             if (perform%gap_soap) then
-               total%forces = total%forces + gap_soap%forces
+               total%forces%array(1:3, 1:state%n_sites) = total%forces%array(1:3, 1:state%n_sites) &
+                                                          + gap_soap%forces%array(1:3, 1:state%n_sites)
                total%virial = total%virial + gap_soap%virial
             end if
 
             if (perform%gap_2b) then
-               total%forces = total%forces + gap_2b%forces
+               total%forces%array(1:3, 1:state%n_sites) = total%forces%array(1:3, 1:state%n_sites) &
+                                                          + gap_2b%forces%array(1:3, 1:state%n_sites)
                total%virial = total%virial + gap_2b%virial
             end if
 
             if (perform%gap_3b) then
-               total%forces = total%forces + gap_3b%forces
+               total%forces%array(1:3, 1:state%n_sites) = total%forces%array(1:3, 1:state%n_sites) &
+                                                          + gap_3b%forces%array(1:3, 1:state%n_sites)
                total%virial = total%virial + gap_3b%virial
             end if
 
             if (perform%gap_core_pot) then
-               total%forces = total%forces + gap_core_pot%forces
+               total%forces%array(1:3, 1:state%n_sites) = total%forces%array(1:3, 1:state%n_sites) &
+                                                          + gap_core_pot%forces%array(1:3, 1:state%n_sites)
                total%virial = total%virial + gap_core_pot%virial
             end if
 
             if (perform%vdw) then
-               total%forces = total%forces + vdw%forces
+               total%forces%array(1:3, 1:state%n_sites) = total%forces%array(1:3, 1:state%n_sites) &
+                                                          + vdw%forces%array(1:3, 1:state%n_sites)
                total%virial = total%virial + vdw%virial
             end if
 
@@ -994,7 +1031,7 @@ contains
 
                call calculate_md_step(do_, perform, md, state, total, thermo,&
                     & file_thermo, format_thermo, file_trajectory,&
-                    & state%local_property_labels, state%local_properties, neighbors%buffer,&
+                    & state%local_property_labels, state%local_properties%array, neighbors%buffer,&
                     & state%energies%exp, energies_string, converged_md, time%writing,&
                     & time%mpi, rank, exit_loop)
 
@@ -1029,7 +1066,7 @@ contains
 
          if (perform%mc_step) then
 
-            ! NOTE: state%local_properties is assigned to a target variable
+            ! NOTE: state%local_properties%array is assigned to a target variable
             ! This means that the resizing operation may fail if not properly dealt with
 
             do_%md = .false.
@@ -1046,9 +1083,10 @@ contains
                                       total, &
                                       file_mc, &
                                       file_mc_log, format_mc_log, &
-                                      time%mc, time%writing)
+                                      time%mc, time%writing, &
+                                      calc_memory%total, calc_memory%max, rank)
 
-               call recalculate_supercell(state, neighbors%rcut_max)
+               call recalculate_supercell(state, neighbors%rcut_max, rank)
 
                if (do_%need_velocities) then
 
@@ -1085,7 +1123,8 @@ contains
                                           this_total, &
                                           this_gap_soap, this_gap_2b, this_gap_3b, &
                                           this_gap_core_pot, &
-                                          this_xrd, this_xps, this_vdw)
+                                          this_xrd, this_xps, this_vdw, &
+                                          calc_memory%total, calc_memory%max, rank)
 
                call time_end(time%allocation)
             end if
@@ -1125,18 +1164,23 @@ contains
             exit main_loop
          end if
 
+         if (do_%print_memory) then
+            call tg_print_memory("state", state%memory%total, state%memory%max, rank)
+            call tg_print_memory("calculations", calc_memory%total, calc_memory%max, rank)
+         end if
+
          state%n_sites_prev = state%n_sites
          neighbors%n_atom_pairs_prev = neighbors%n_atom_pairs
 
          if (do_%rebuild_neighbors_list) then
             if (do_%print_memory) call tg_print_memory("neighbors", neighbors%memory%total, neighbors%memory%max, rank)
 
-            neighbors_rcut_max = neighbors%rcut_max
-            neighbors_rcut_buffer = neighbors%buffer
-            call deallocate_neighbors(neighbors, rank)
+            ! neighbors_rcut_max = neighbors%rcut_max
+            ! neighbors_rcut_buffer = neighbors%buffer
+            ! call deallocate_neighbors(neighbors, rank)
 
-            neighbors%rcut_max = neighbors_rcut_max
-            neighbors%buffer = neighbors_rcut_buffer
+            ! neighbors%rcut_max = neighbors_rcut_max
+            ! neighbors%buffer = neighbors_rcut_buffer
          end if
 
       end do main_loop

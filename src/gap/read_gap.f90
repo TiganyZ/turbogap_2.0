@@ -341,7 +341,7 @@ contains
                      backspace (10)
                      call check_deprecated(n_deprecated, deprecated_keywords, updated_keywords, keyword)
                      !read(10, *, iostat=iostatus) cjunk, cjunk, soap_turbo_hypers(n_soap_turbo)%file_vdw_alphas
-                    read (10, *, iostat=iostatus) cjunk, cjunk, soap_turbo_hypers(n_soap_turbo)%local_property_models(1)%file_alphas
+                     read (10, *, iostat=iostatus) cjunk, cjunk, soap_turbo_hypers(n_soap_turbo)%local_property_models(1)%file_alphas
                   else if (keyword == "vdw_zeta") then
                      backspace (10)
                      call check_deprecated(n_deprecated, deprecated_keywords, updated_keywords, keyword)
@@ -730,7 +730,7 @@ contains
                else
                   qn = 0.5d0
                   un = (3.d0/(core_pot_hypers(n_core_pot)%x(n) - core_pot_hypers(n_core_pot)%x(n - 1)))* &
-                      (core_pot_hypers(n_core_pot)%ypn - (core_pot_hypers(n_core_pot)%V(n) - core_pot_hypers(n_core_pot)%V(n - 1)) &
+                       (core_pot_hypers(n_core_pot)%ypn - (core_pot_hypers(n_core_pot)%V(n) - core_pot_hypers(n_core_pot)%V(n - 1)) &
                         /(core_pot_hypers(n_core_pot)%x(n) - core_pot_hypers(n_core_pot)%x(n - 1)))
                end if
                core_pot_hypers(n_core_pot)%dVdx2(n) = (un - qn*u(n - 1))/(qn*core_pot_hypers(n_core_pot)%dVdx2(n - 1) + 1.d0)

@@ -3,6 +3,7 @@ module calculation
    use kinds, only: dp
    use types, only: calculation_t
    use control, only: control_t, perform_t
+   use tg_memory, only: tg_alloc, tg_allocate
    implicit none
 
 contains
@@ -11,10 +12,10 @@ contains
       logical, intent(in) :: do_forces
       type(calculation_t), intent(inout) :: calc
 
-      calc%energies = 0.0_dp
+      calc%energies%array = 0.0_dp
 
       if (do_forces) then
-         calc%forces = 0.0_dp
+         calc%forces%array = 0.0_dp
       end if
 
       calc%virial = 0.0_dp
@@ -110,14 +111,21 @@ contains
 
    end subroutine reset_calculations
 
-   subroutine allocate_calculation(n_sites, calc, do_forces)
+   subroutine allocate_calculation(n_sites, calc, do_forces, memory_total, memory_max, rank, name)
       integer, intent(in) :: n_sites
       logical, intent(in) :: do_forces
-      type(calculation_t), intent(out) :: calc
+      ! NOTE: intent(inout), not intent(out) - see allocate_calculations for why.
+      type(calculation_t), intent(inout) :: calc
+      real(dp), intent(inout) :: memory_total
+      real(dp), intent(inout) :: memory_max
+      integer, intent(in) :: rank
+      character(len=*), intent(in) :: name
 
-      allocate (calc%energies(1:n_sites), source=0.0_dp)
+      call tg_alloc(calc%energies, [n_sites], memory_total, memory_max, rank, trim(name)//"%energies")
+      calc%energies%array = 0.0_dp
       if (do_forces) then
-         allocate (calc%forces(1:3, 1:n_sites), source=0.0_dp)
+         call tg_alloc(calc%forces, [3, n_sites], memory_total, memory_max, rank, trim(name)//"%forces")
+         calc%forces%array = 0.0_dp
       end if
 
       calc%virial = 0.0_dp
@@ -143,76 +151,89 @@ contains
                                     this_gap_core_pot, &
                                     this_xrd, &
                                     this_xps, &
-                                    this_vdw)
+                                    this_vdw, &
+                                    memory_total, memory_max, rank)
 
       type(perform_t), intent(in) :: perform
       integer, intent(in) :: n_sites
       logical, intent(in) :: do_forces
+      real(dp), intent(inout) :: memory_total
+      real(dp), intent(inout) :: memory_max
+      integer, intent(in) :: rank
 
-      real(dp), allocatable, intent(out) :: energies_e0(:)
-      real(dp), allocatable, intent(out) :: this_energies_e0(:)
+      real(dp), allocatable, intent(inout) :: energies_e0(:)
+      real(dp), allocatable, intent(inout) :: this_energies_e0(:)
 
-      type(calculation_t), intent(out) :: total
-      type(calculation_t), intent(out) :: gap_soap
-      type(calculation_t), intent(out) :: gap_2b
-      type(calculation_t), intent(out) :: gap_3b
-      type(calculation_t), intent(out) :: gap_core_pot
+      ! NOTE: intent(inout), not intent(out). calculation_t's energies/forces
+      ! are tg_array_1_dp/tg_array_2_dp; intent(out) would reset %allocated to
+      ! .false. on every call before tg_alloc's reuse-if-big-enough check could
+      ! run, forcing a full reallocation every step and defeating the point of
+      ! using tg_alloc here (same trap as neighbors_interface.f90's
+      ! deallocate_neighbors before it was fixed to intent(inout)).
+      type(calculation_t), intent(inout) :: total
+      type(calculation_t), intent(inout) :: gap_soap
+      type(calculation_t), intent(inout) :: gap_2b
+      type(calculation_t), intent(inout) :: gap_3b
+      type(calculation_t), intent(inout) :: gap_core_pot
 
-      type(calculation_t), intent(out) :: pdf
-      type(calculation_t), intent(out) :: sf
-      type(calculation_t), intent(out) :: xrd
-      type(calculation_t), intent(out) :: nd
-      type(calculation_t), intent(out) :: xps
-      type(calculation_t), intent(out) :: vdw
+      type(calculation_t), intent(inout) :: pdf
+      type(calculation_t), intent(inout) :: sf
+      type(calculation_t), intent(inout) :: xrd
+      type(calculation_t), intent(inout) :: nd
+      type(calculation_t), intent(inout) :: xps
+      type(calculation_t), intent(inout) :: vdw
 
-      type(calculation_t), intent(out) :: this_total
-      type(calculation_t), intent(out) :: this_gap_soap
-      type(calculation_t), intent(out) :: this_gap_2b
-      type(calculation_t), intent(out) :: this_gap_3b
-      type(calculation_t), intent(out) :: this_gap_core_pot
-      type(calculation_t), intent(out) :: this_xrd
-      type(calculation_t), intent(out) :: this_xps
-      type(calculation_t), intent(out) :: this_vdw
+      type(calculation_t), intent(inout) :: this_total
+      type(calculation_t), intent(inout) :: this_gap_soap
+      type(calculation_t), intent(inout) :: this_gap_2b
+      type(calculation_t), intent(inout) :: this_gap_3b
+      type(calculation_t), intent(inout) :: this_gap_core_pot
+      type(calculation_t), intent(inout) :: this_xrd
+      type(calculation_t), intent(inout) :: this_xps
+      type(calculation_t), intent(inout) :: this_vdw
 
-      allocate (energies_e0(n_sites), source=0.0_dp)
-      allocate (this_energies_e0(n_sites), source=0.0_dp)
+      call tg_allocate(energies_e0, [n_sites], memory_total, memory_max, rank, "energies_e0")
+      energies_e0 = 0.0_dp
+      call tg_allocate(this_energies_e0, [n_sites], memory_total, memory_max, rank, "this_energies_e0")
+      this_energies_e0 = 0.0_dp
 
-      call allocate_calculation(n_sites, total, do_forces)
+      call allocate_calculation(n_sites, total, do_forces, memory_total, memory_max, rank, "total")
 
       if (perform%gap_soap) then
-         call allocate_calculation(n_sites, gap_soap, do_forces)
-         call allocate_calculation(n_sites, this_gap_soap, do_forces)
+         call allocate_calculation(n_sites, gap_soap, do_forces, memory_total, memory_max, rank, "gap_soap")
+         call allocate_calculation(n_sites, this_gap_soap, do_forces, memory_total, memory_max, rank, "this_gap_soap")
       end if
 
       if (perform%gap_2b) then
-         call allocate_calculation(n_sites, gap_2b, do_forces)
-         call allocate_calculation(n_sites, this_gap_2b, do_forces)
+         call allocate_calculation(n_sites, gap_2b, do_forces, memory_total, memory_max, rank, "gap_2b")
+         call allocate_calculation(n_sites, this_gap_2b, do_forces, memory_total, memory_max, rank, "this_gap_2b")
       end if
 
       if (perform%gap_3b) then
-         call allocate_calculation(n_sites, gap_3b, do_forces)
-         call allocate_calculation(n_sites, this_gap_3b, do_forces)
+         call allocate_calculation(n_sites, gap_3b, do_forces, memory_total, memory_max, rank, "gap_3b")
+         call allocate_calculation(n_sites, this_gap_3b, do_forces, memory_total, memory_max, rank, "this_gap_3b")
       end if
 
       if (perform%gap_core_pot) then
-         call allocate_calculation(n_sites, gap_core_pot, do_forces)
-         call allocate_calculation(n_sites, this_gap_core_pot, do_forces)
+         call allocate_calculation(n_sites, gap_core_pot, do_forces, memory_total, memory_max, rank, "gap_core_pot")
+         call allocate_calculation(n_sites, this_gap_core_pot, do_forces, memory_total, memory_max, rank, &
+                                   "this_gap_core_pot")
       end if
 
       if (perform%vdw) then
-         call allocate_calculation(n_sites, vdw, do_forces)
-         call allocate_calculation(n_sites, this_vdw, do_forces)
+         call allocate_calculation(n_sites, vdw, do_forces, memory_total, memory_max, rank, "vdw")
+         call allocate_calculation(n_sites, this_vdw, do_forces, memory_total, memory_max, rank, "this_vdw")
       end if
 
       !! Allocate Experimental Calculations
       if (perform%pdf) &
-         call allocate_calculation(n_sites, pdf, do_forces)
+         call allocate_calculation(n_sites, pdf, do_forces, memory_total, memory_max, rank, "pdf")
       if (perform%xrd) &
-         call allocate_calculation(n_sites, xrd, do_forces)
+         call allocate_calculation(n_sites, xrd, do_forces, memory_total, memory_max, rank, "xrd")
       if (perform%nd) &
-         call allocate_calculation(n_sites, nd, do_forces)
+         call allocate_calculation(n_sites, nd, do_forces, memory_total, memory_max, rank, "nd")
       if (perform%xps) &
-         call allocate_calculation(n_sites, xps, do_forces)
+         call allocate_calculation(n_sites, xps, do_forces, memory_total, memory_max, rank, "xps")
 
    end subroutine allocate_calculations
 
