@@ -5,9 +5,14 @@ include/
 lib/
 make_tests.sh
 plan.org
-src/control/control.mod
 src/xyz/read_xyz_backup.f90
 src_bk/
 test_types/
 tests/
 tests_manual/
+
+# Compiled Fortran artifacts - can end up outside build/ when compiling a
+# single file by hand (e.g. src/madlib/*.mod, src/vdw/*.mod)
+*.mod
+*.o
+*.a

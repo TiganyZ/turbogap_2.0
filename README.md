@@ -67,9 +67,9 @@ use the **TurboGAP** interface, and feedback can be sent to Miguel Caro (mcaroba
 or left on the Issues section of the Github page.
 
 [1] M.A. Caro. [Phys. Rev. B 100, 024112
-(2019)](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.100.024112).  
+(2019)](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.100.024112).
 [2] A.P. Bartók, R. Kondor, G. Csányi. [Phys. Rev. B 87, 184115
-(2013)](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.87.184115).  
+(2013)](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.87.184115).
 [3] A.P. Bartók, M.C. Payne, R. Kondor, G. Csányi. [Phys. Rev. Lett. 104, 136403
 (2010)](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.104.136403).
 

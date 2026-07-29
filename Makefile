@@ -17,7 +17,7 @@ LIB_DIR=lib
 # Do not change anything below this line
 ##########################################################
 
-# Precompiler options can be found here 
+# Precompiler options can be found here
 # -D_CHECK_DEALLOCATE
 # -D_DEBUG
 
@@ -144,48 +144,10 @@ test: programs
 # unused/experimental prototype files scattered under src/ (src/gpu,
 # src/allocation/test/, src/allocation/allocation.f90, src/allocation/tg_alloc.f90,
 # ...) that were never wired into $(SRC) and aren't real, tested source.
-FPRETTIFY_FILES := \
-	src/control/control.f90 \
-	src/control/control_interface.f90 \
-	src/control/read_control.f90 \
-	src/gap/calculate_gap_soap.f90 \
-	src/gap/gap.f90 \
-	src/gap/gap_interface.f90 \
-	src/gap/local_properties.f90 \
-	src/gap/read_gap.f90 \
-	src/madlib/exp_types.f90 \
-	src/madlib/read_exp.f90 \
-	src/mc/mc_interface.f90 \
-	src/mc/mc_types.f90 \
-	src/mc/mc_utils.f90 \
-	src/mc/read_mc.f90 \
-	src/md/md_interface.f90 \
-	src/md/md_types.f90 \
-	src/md/md_utils.f90 \
-	src/md/read_md.f90 \
-	src/mpi/mpi_utils.f90 \
-	src/neighbors/neighbors_interface.f90 \
-	src/read/read_files.f90 \
-	src/read/read_utils.f90 \
-	src/turbogap.f90 \
-	src/turbogap_main.f90 \
-	src/types/types.f90 \
-	src/utils/calculation.f90 \
-	src/utils/constants.f90 \
-	src/utils/error.f90 \
-	src/utils/functions.f90 \
-	src/utils/kinds.f90 \
-	src/utils/misc.f90 \
-	src/utils/printing.f90 \
-	src/utils/splines.f90 \
-	src/utils/state_interface.f90 \
-	src/utils/timer.f90 \
-	src/utils/timing.f90 \
-	src/vdw/read_vdw.f90 \
-	src/vdw/vdw_interface.f90 \
-	src/vdw/vdw_types.f90 \
-	src/xyz/read_xyz.f90 \
-	src/xyz/write_xyz.f90
+# The list itself lives in .fprettify-files.txt (one path per line) so the
+# pre-commit fprettify hook (scripts/run_fprettify.sh) can share the exact
+# same scope instead of drifting out of sync with a second copy.
+FPRETTIFY_FILES := $(shell cat .fprettify-files.txt)
 
 format:
 	fprettify -c .fprettify.rc $(FPRETTIFY_FILES)

@@ -1,0 +1,51 @@
+# Local dev-time checks that mirror what CI enforces (see .github/workflows/ci.yml
+# and Makefile's format/format-check targets), so formatting drift and other
+# easy mistakes are caught before push instead of after.
+#
+# Setup (once per clone):
+#   pip install pre-commit fprettify
+#   pre-commit install
+#
+# Run on demand against the whole tree:
+#   pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '^src/(soap_turbo|third_party)/'
+      - id: end-of-file-fixer
+        exclude: '^src/(soap_turbo|third_party)/|^src/allocation/tg_memory\.f90$'
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+  - repo: local
+    hooks:
+      - id: fprettify
+        name: fprettify (Fortran formatter)
+        description: Auto-formats real turbogap source files with fprettify, same scope as `make format`.
+        entry: scripts/run_fprettify.sh
+        language: script
+        files: '\.f90$'
+
+      - id: copyright-header
+        name: TurboGAP copyright header
+        description: Every hand-written .f90 file must carry the standard HND copyright banner.
+        entry: scripts/check_copyright_header.sh
+        language: script
+        files: '\.f90$'
+        exclude: '^src/(soap_turbo|third_party)/|^src/allocation/tg_memory\.f90$'
+
+      - id: no-build-artifacts
+        name: no compiled build artifacts
+        description: Blocks accidentally-staged .mod/.o/.a files (build output, not source).
+        entry: scripts/check_no_build_artifacts.sh
+        language: script
+        files: '\.(mod|o|a)$'
